@@ -639,8 +639,20 @@
       <div class="card mb-15">
         <div class="card-title">
           Monthly budgets
-          <span class="subtitle">Click any amount to edit · changes save automatically</span>
+          <button class="btn btn-sm btn-secondary" onclick="toggleManageCats()" id="manageCatsBtn">⚙ Manage categories</button>
         </div>
+
+        <!-- Manage categories panel -->
+        <div id="manageCatsPanel" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:1rem;margin-bottom:1rem;">
+          <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:10px;">Categories — click emoji or name to edit, drag to reorder</div>
+          <div id="catManageList"></div>
+          <div style="display:flex;gap:8px;margin-top:12px;align-items:center;">
+            <input type="text" id="newCatEmoji" placeholder="😀" maxlength="2" style="width:48px;padding:7px;font-size:16px;text-align:center;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);">
+            <input type="text" id="newCatName" placeholder="New category name" class="form-control" style="flex:1;">
+            <button class="btn btn-primary btn-sm" onclick="addCategory()">+ Add</button>
+          </div>
+        </div>
+
         <div id="budgetTable"></div>
         <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
           <span style="font-size:13px;color:var(--text3);">Total budget</span>
@@ -678,9 +690,11 @@
 <script>
 // ── STATE ──
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const CATS = ['Food','Transport','Bills','Health','Education','Shopping','Entertainment','Savings','Income','Other'];
-const CAT_EMOJI = {Food:'🍽',Transport:'🚗',Bills:'💡',Health:'🏥',Education:'📚',Shopping:'🛍',Entertainment:'🎉',Savings:'💰',Income:'💵',Other:'📌'};
-const CAT_COLORS = ['#2D6A4F','#1A5F9E','#B7770D','#C0392B','#7B68EE','#E67E22','#16A085','#8E44AD','#27AE60','#7F8C8D'];
+const DEFAULT_CATS = ['Food','Transport','Bills','Health','Education','Shopping','Entertainment','Savings','Income','Other'];
+const DEFAULT_EMOJI = {Food:'🍽',Transport:'🚗',Bills:'💡',Health:'🏥',Education:'📚',Shopping:'🛍',Entertainment:'🎉',Savings:'💰',Income:'💵',Other:'📌'};
+const CAT_COLORS = ['#2D6A4F','#1A5F9E','#B7770D','#C0392B','#7B68EE','#E67E22','#16A085','#8E44AD','#27AE60','#7F8C8D','#D35400','#1ABC9C','#8E44AD','#2980B9'];
+let CATS = JSON.parse(localStorage.getItem('dk_cats') || JSON.stringify(DEFAULT_CATS));
+let CAT_EMOJI = JSON.parse(localStorage.getItem('dk_emoji') || JSON.stringify(DEFAULT_EMOJI));
 
 let now = new Date();
 let curYear = now.getFullYear(), curMonth = now.getMonth();
@@ -697,6 +711,8 @@ function save() {
   localStorage.setItem('dk_tx', JSON.stringify(transactions));
   localStorage.setItem('dk_budgets', JSON.stringify(budgets));
   localStorage.setItem('dk_goals', JSON.stringify(goals));
+  localStorage.setItem('dk_cats', JSON.stringify(CATS));
+  localStorage.setItem('dk_emoji', JSON.stringify(CAT_EMOJI));
 }
 function saveApiKey(v) { localStorage.setItem('dk_apikey', v); }
 function getApiKey() { return localStorage.getItem('dk_apikey') || document.getElementById('apiKeyInput').value; }
@@ -1085,6 +1101,107 @@ function renderCharts(mtx) {
 
 function buildBudgetInputs() {
   renderBudgetTable();
+  renderCatManageList();
+}
+
+function toggleManageCats() {
+  const panel = document.getElementById('manageCatsPanel');
+  const btn = document.getElementById('manageCatsBtn');
+  const open = panel.style.display === 'none';
+  panel.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? '✕ Close' : '⚙ Manage categories';
+  if(open) renderCatManageList();
+}
+
+function renderCatManageList() {
+  const el = document.getElementById('catManageList');
+  if(!el) return;
+  el.innerHTML = CATS.map((cat, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
+      <input type="text" value="${CAT_EMOJI[cat]||'📌'}" maxlength="2"
+        style="width:40px;font-size:16px;text-align:center;padding:4px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);"
+        onchange="updateCatEmoji(${i}, this.value)">
+      <input type="text" value="${cat}"
+        style="flex:1;padding:6px 10px;font-size:14px;font-weight:500;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);"
+        onchange="renameCategory(${i}, this.value)"
+        onkeydown="if(event.key==='Enter')this.blur();">
+      ${cat === 'Income' ? '<span style="font-size:12px;color:var(--text3);padding:0 8px;">required</span>' :
+        `<button onclick="deleteCategory(${i})" style="padding:5px 10px;background:var(--danger-light);color:var(--danger);border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">✕</button>`}
+    </div>`).join('');
+}
+
+function addCategory() {
+  const name = document.getElementById('newCatName').value.trim();
+  const emoji = document.getElementById('newCatEmoji').value.trim() || '📌';
+  if(!name) { toast('Enter a category name.', 'error'); return; }
+  if(CATS.includes(name)) { toast('Category already exists.', 'error'); return; }
+  CATS.push(name);
+  CAT_EMOJI[name] = emoji;
+  save();
+  document.getElementById('newCatName').value = '';
+  document.getElementById('newCatEmoji').value = '';
+  renderCatManageList();
+  renderBudgetTable();
+  refreshCatDropdowns();
+  toast('Category added!');
+}
+
+function renameCategory(i, newName) {
+  newName = newName.trim();
+  if(!newName || newName === CATS[i]) return;
+  if(CATS.includes(newName)) { toast('Name already exists.', 'error'); return; }
+  const oldName = CATS[i];
+  // Update transactions
+  transactions.forEach(t => { if(t.cat === oldName) t.cat = newName; });
+  // Update budgets
+  if(budgets[oldName] !== undefined) { budgets[newName] = budgets[oldName]; delete budgets[oldName]; }
+  // Update emoji
+  CAT_EMOJI[newName] = CAT_EMOJI[oldName] || '📌';
+  delete CAT_EMOJI[oldName];
+  CATS[i] = newName;
+  save();
+  renderBudgetTable();
+  renderCatManageList();
+  refreshCatDropdowns();
+  toast('Category renamed!');
+}
+
+function updateCatEmoji(i, emoji) {
+  const cat = CATS[i];
+  CAT_EMOJI[cat] = emoji || '📌';
+  save();
+  renderBudgetTable();
+}
+
+function deleteCategory(i) {
+  const cat = CATS[i];
+  if(cat === 'Income') return;
+  if(transactions.some(t => t.cat === cat)) {
+    if(!confirm('This category has transactions. They will be moved to "Other". Continue?')) return;
+    transactions.forEach(t => { if(t.cat === cat) t.cat = 'Other'; });
+  }
+  delete budgets[cat];
+  delete CAT_EMOJI[cat];
+  CATS.splice(i, 1);
+  save();
+  renderCatManageList();
+  renderBudgetTable();
+  refreshCatDropdowns();
+  toast('Category deleted.');
+}
+
+function refreshCatDropdowns() {
+  // Update the category dropdowns in manual add & transactions filter
+  const mCat = document.getElementById('mCat');
+  const filterCat = document.getElementById('filterCat');
+  if(mCat) {
+    const cur = mCat.value;
+    mCat.innerHTML = CATS.map(c => `<option value="${c}" ${c===cur?'selected':''}>${CAT_EMOJI[c]||'📌'} ${c}</option>`).join('');
+  }
+  if(filterCat) {
+    const cur = filterCat.value;
+    filterCat.innerHTML = '<option value="">All categories</option>' + [...new Set(transactions.map(t=>t.cat))].map(c=>`<option value="${c}" ${c===cur?'selected':''}>${CAT_EMOJI[c]||''} ${c}</option>`).join('');
+  }
 }
 
 function renderBudgetTable() {
