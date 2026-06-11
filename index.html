@@ -438,7 +438,9 @@ hr.div{border:none;border-top:1px solid var(--border);margin:.875rem 0;}
       <div class="settings-row">
         <div><div class="settings-label">API Key Gemini</div><div class="settings-sub">Untuk AI Scan foto/struk</div></div>
       </div>
-      <input type="password" id="geminiKeyInput" class="form-control" placeholder="AIza..." onchange="saveGeminiKey(this.value)" style="margin-bottom:0;">
+      <input type="password" id="geminiKeyInput" class="form-control" placeholder="AIza..." onchange="saveGeminiKey(this.value)" style="margin-bottom:8px;">
+      <button class="btn btn-secondary btn-sm" onclick="checkGeminiModels()" id="checkModelBtn" style="width:100%;">🔍 Cek model yang tersedia</button>
+      <div id="geminiModelStatus" style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.6;"></div>
     </div>
 
     <!-- Export -->
@@ -1051,7 +1053,53 @@ function exportExcel(){
   toast(`✅ ${filtered.length} transaksi diexport!`,'success');
 }
 
-// ── AI SCAN ──
+// ── CHECK GEMINI MODELS ──
+async function checkGeminiModels(){
+  const key=getGeminiKey();
+  if(!key){toast('Masukkan Gemini API Key dulu.','error');return;}
+  const btn=document.getElementById('checkModelBtn');
+  const statusEl=document.getElementById('geminiModelStatus');
+  btn.disabled=true;
+  statusEl.innerHTML='<span class="spinner"></span> Mengecek...';
+
+  const MODELS_TO_CHECK=[
+    ['gemini-1.5-flash','v1'],
+    ['gemini-1.5-pro','v1'],
+    ['gemini-1.5-flash','v1beta'],
+    ['gemini-pro-vision','v1beta'],
+    ['gemini-2.0-flash','v1beta'],
+    ['gemini-2.0-flash-lite','v1beta'],
+  ];
+
+  // Use list models API to find what's available
+  try{
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+    if(r.ok){
+      const d=await r.json();
+      const available=(d.models||[]).filter(m=>m.supportedGenerationMethods?.includes('generateContent'));
+      if(available.length){
+        const names=available.map(m=>`✅ ${m.name.replace('models/','')}`).join('<br>');
+        statusEl.innerHTML=`<b>Model tersedia:</b><br>${names}`;
+        // Auto-set best model
+        const best=available.find(m=>m.name.includes('flash')||m.name.includes('vision'));
+        if(best){
+          const modelName=best.name.replace('models/','');
+          localStorage.setItem('dkGeminiModel',modelName);
+          statusEl.innerHTML+=`<br><br>✨ <b>Auto-pilih: ${modelName}</b>`;
+          toast('Model terbaik ditemukan: '+modelName,'success');
+        }
+      } else {
+        statusEl.innerHTML='❌ Tidak ada model yang mendukung generateContent.';
+      }
+    } else {
+      const e=await r.json();
+      statusEl.innerHTML='❌ Error: '+(e.error?.message||'Gagal mengecek');
+    }
+  }catch(e){statusEl.innerHTML='❌ '+e.message;}
+  btn.disabled=false;
+}
+
+
 async function runAI(){
   const isImg=document.getElementById('tab-img').style.display!=='none';
   const note=document.getElementById('noteInput').value.trim();
@@ -1071,12 +1119,24 @@ Kembalikan HANYA array JSON yang valid. Setiap item:
 {"desc":"keterangan singkat","amount":angka_IDR,"category":"salah satu dari [Food,Transport,Transport Car,Transport Motor,Home debt,Electricity,Water,Internet,Utilities,Shopping,Child milk,Personal,Personal shopping,Gifts,Parents,Wife,Holiday,Dinner,Breakfast,Repair House,Others,Cashout,E-money,Arisan,Zumba,Qurban,Hutang,Posyandu,Income]","type":"expense atau income","date":"YYYY-MM-DD atau null"}
 Konversi: "150 ribu"=150000, "5 juta"=5000000. Kembalikan HANYA array JSON tanpa markdown.`;
     try{
-      // Try gemini-1.5-flash first, fallback to gemini-1.5-flash-latest
-      const GEMINI_MODELS=['gemini-1.5-flash','gemini-1.5-flash-latest','gemini-1.0-pro-vision-latest'];
-      let res, lastErr;
-      for(const model of GEMINI_MODELS){
+      // Use auto-detected model if available, otherwise try all
+      const savedModel=localStorage.getItem('dkGeminiModel');
+      const GEMINI_ENDPOINTS=[];
+      if(savedModel){
+        GEMINI_ENDPOINTS.push(`https://generativelanguage.googleapis.com/v1beta/models/${savedModel}:generateContent?key=${geminiKey}`);
+        GEMINI_ENDPOINTS.push(`https://generativelanguage.googleapis.com/v1/models/${savedModel}:generateContent?key=${geminiKey}`);
+      }
+      GEMINI_ENDPOINTS.push(
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${geminiKey}`,
+      );
+      let res=null, lastErr='', usedModel='';
+      for(const url of GEMINI_ENDPOINTS){
         try{
-          res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,{
+          const r=await fetch(url,{
             method:'POST',
             headers:{'Content-Type':'application/json'},
             body:JSON.stringify({contents:[{parts:[
@@ -1084,13 +1144,12 @@ Konversi: "150 ribu"=150000, "5 juta"=5000000. Kembalikan HANYA array JSON tanpa
               {text:prompt}
             ]}]})
           });
-          if(res.ok) break;
-          const e=await res.json();
-          lastErr=e.error?.message||'Gemini API error';
-          res=null;
-        }catch(e){lastErr=e.message;res=null;}
+          if(r.ok){res=r;usedModel=url.match(/models\/([^:]+)/)?.[1]||'';break;}
+          const e=await r.json();
+          lastErr=e.error?.message||'Model tidak tersedia';
+        }catch(e){lastErr=e.message;}
       }
-      if(!res){throw new Error(lastErr||'Semua model Gemini gagal.');}
+      if(!res){throw new Error('Semua model gagal. '+lastErr+'\n\nCoba tap "Cek model tersedia" di Pengaturan.');}
       const data=await res.json();
       const raw=(data.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();
       let parsed;
