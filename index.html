@@ -2,814 +2,517 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dompet Keluarga — Family Budget</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js">
-let editingTxId = null;
-let editTxType = 'expense';
-
-function openEditModal(id) {
-  const t = transactions.find(t => t.id === id);
-  if(!t) return;
-  editingTxId = id;
-  editTxType = t.type;
-  document.getElementById('editDesc').value = t.desc;
-  document.getElementById('editAmount').value = t.amount;
-  document.getElementById('editDate').value = t.date;
-  // Populate category dropdown
-  const sel = document.getElementById('editCat');
-  sel.innerHTML = CATS.map(c => `<option value="${c}" ${c===t.cat?'selected':''}>${CAT_EMOJI[c]||'📌'} ${c}</option>`).join('');
-  sel.value = t.cat;
-  // Set type buttons
-  setEditType(t.type);
-  document.getElementById('editModal').style.display = 'flex';
-}
-
-function closeEditModal() {
-  document.getElementById('editModal').style.display = 'none';
-  editingTxId = null;
-}
-
-function setEditType(t) {
-  editTxType = t;
-  document.getElementById('editBtnExpense').className = 'type-btn' + (t==='expense'?' active-expense':'');
-  document.getElementById('editBtnIncome').className = 'type-btn' + (t==='income'?' active-income':'');
-}
-
-function saveEditTx() {
-  const desc = document.getElementById('editDesc').value.trim();
-  const amount = parseFloat(document.getElementById('editAmount').value) || 0;
-  const cat = document.getElementById('editCat').value;
-  const date = document.getElementById('editDate').value;
-  if(!desc) { toast('Enter a description.', 'error'); return; }
-  if(amount <= 0) { toast('Enter a valid amount.', 'error'); return; }
-  const idx = transactions.findIndex(t => t.id === editingTxId);
-  if(idx === -1) return;
-  transactions[idx] = { ...transactions[idx], desc, amount, cat, date, type: editTxType };
-  save();
-  closeEditModal();
-  toast('Transaction updated!');
-  render();
-}
-
-function deleteTxFromModal() {
-  if(!editingTxId) return;
-  if(!confirm('Delete this transaction?')) return;
-  transactions = transactions.filter(t => t.id !== editingTxId);
-  save();
-  closeEditModal();
-  toast('Transaction deleted.');
-  render();
-}
-
-// Close modal on backdrop click
-document.getElementById('editModal').addEventListener('click', function(e) {
-  if(e.target === this) closeEditModal();
-});
-
-</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Dompet Keluarga</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#F5F4F0;
+  --surface:#FFFFFF;
+  --surface2:#EEECE7;
+  --border:#E4E1D8;
+  --text:#1A1916;
+  --text2:#6B6760;
+  --text3:#A09D97;
+  --green:#1D8A5E;
+  --green-light:#D6F0E4;
+  --red:#C73535;
+  --red-light:#FCEAEA;
+  --blue:#1759A8;
+  --blue-light:#DBE9FC;
+  --ayah:#1759A8;
+  --ayah-light:#DBE9FC;
+  --ayah-bg:#EEF4FD;
+  --ibu:#B5365E;
+  --ibu-light:#F9E0EA;
+  --ibu-bg:#FDF0F5;
+  --r:14px;
+  --r-sm:9px;
+  --shadow:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.05);
+  --shadow-lg:0 8px 24px rgba(0,0,0,.10),0 2px 6px rgba(0,0,0,.06);
+}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px;}
 
-  :root {
-    --bg: #F7F6F2;
-    --surface: #FFFFFF;
-    --surface2: #F0EEE8;
-    --border: #E2DED5;
-    --text: #1A1916;
-    --text2: #6B6760;
-    --text3: #9B9890;
-    --accent: #2D6A4F;
-    --accent-light: #D8EDDF;
-    --accent-text: #1A4535;
-    --danger: #C0392B;
-    --danger-light: #FDECEA;
-    --warn: #B7770D;
-    --warn-light: #FEF3DC;
-    --blue: #1A5F9E;
-    --blue-light: #DDEAF8;
-    --radius: 12px;
-    --radius-sm: 8px;
-    --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.05);
-    --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.05);
-  }
+/* ── HEADER ── */
+.header{
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  padding:0 1rem;
+  height:56px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:50;
+  gap:8px;
+}
+.brand{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:var(--green);white-space:nowrap;}
+.brand span{color:var(--text);}
+.month-nav{display:flex;align-items:center;gap:6px;}
+.month-nav button{width:30px;height:30px;border:1px solid var(--border);background:var(--surface);border-radius:8px;cursor:pointer;font-size:15px;color:var(--text2);display:flex;align-items:center;justify-content:center;}
+.month-nav .mlabel{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;min-width:90px;text-align:center;}
 
-  body {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    font-size: 15px;
-    line-height: 1.6;
-    min-height: 100vh;
-  }
+/* ── MEMBER TABS ── */
+.member-tabs{
+  display:flex;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  padding:0 1rem;
+  gap:0;
+}
+.member-tab{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  padding:10px 4px 8px;
+  border-bottom:3px solid transparent;
+  cursor:pointer;border:none;background:none;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:12px;font-weight:600;color:var(--text3);
+  transition:all .15s;gap:2px;
+}
+.member-tab .avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--surface2);transition:all .15s;}
+.member-tab.active-family{color:var(--green);border-bottom-color:var(--green);}
+.member-tab.active-family .avatar{background:var(--green-light);}
+.member-tab.active-ayah{color:var(--ayah);border-bottom-color:var(--ayah);}
+.member-tab.active-ayah .avatar{background:var(--ayah-light);}
+.member-tab.active-ibu{color:var(--ibu);border-bottom-color:var(--ibu);}
+.member-tab.active-ibu .avatar{background:var(--ibu-light);}
 
-  /* ── TOPBAR ── */
-  .topbar {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 0 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 60px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .topbar-brand {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--accent);
-    letter-spacing: -0.3px;
-  }
-  .topbar-brand span { color: var(--text); }
-  .month-nav {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .month-nav button {
-    width: 32px; height: 32px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 16px;
-    color: var(--text2);
-    display: flex; align-items: center; justify-content: center;
-    transition: background .15s;
-  }
-  .month-nav button:hover { background: var(--surface2); }
-  .month-nav .month-label {
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 500;
-    font-size: 15px;
-    min-width: 140px;
-    text-align: center;
-  }
+/* ── BOTTOM NAV ── */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;
+  background:var(--surface);
+  border-top:1px solid var(--border);
+  display:flex;
+  z-index:50;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.nav-btn{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:8px 4px 6px;gap:3px;
+  border:none;background:none;cursor:pointer;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:11px;font-weight:600;color:var(--text3);
+  transition:all .15s;
+}
+.nav-btn svg{transition:all .15s;}
+.nav-btn.active{color:var(--green);}
+.nav-btn.active svg{stroke:var(--green);}
 
-  /* ── LAYOUT ── */
-  .layout {
-    display: grid;
-    grid-template-columns: 240px 1fr;
-    min-height: calc(100vh - 60px);
-  }
-  .sidebar {
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    padding: 1.5rem 1rem;
-    position: sticky;
-    top: 60px;
-    height: calc(100vh - 60px);
-    overflow-y: auto;
-  }
-  .main { padding: 2rem; overflow-y: auto; }
+/* ── MAIN ── */
+.main{padding:1rem 1rem 80px;max-width:600px;margin:0 auto;}
 
-  /* ── NAV ── */
-  .nav-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 12px;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    color: var(--text2);
-    font-size: 14px;
-    font-weight: 500;
-    transition: all .15s;
-    margin-bottom: 2px;
-    border: none;
-    background: none;
-    width: 100%;
-    text-align: left;
-  }
-  .nav-item svg { flex-shrink: 0; }
-  .nav-item:hover { background: var(--surface2); color: var(--text); }
-  .nav-item.active { background: var(--accent-light); color: var(--accent-text); font-weight: 600; }
-  .nav-section { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .8px; padding: 1rem 12px 6px; }
+/* ── PAGE ── */
+.page{display:none;}
+.page.active{display:block;}
 
-  /* ── PAGES ── */
-  .page { display: none; }
-  .page.active { display: block; }
+/* ── CARDS ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.125rem;box-shadow:var(--shadow);margin-bottom:.875rem;}
+.card-title{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;margin-bottom:.875rem;display:flex;justify-content:space-between;align-items:center;}
+.card-sub{font-size:12px;font-weight:500;color:var(--text3);}
 
-  /* ── CARDS ── */
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.25rem 1.5rem;
-    box-shadow: var(--shadow);
-  }
-  .card-title {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 1rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-  .card-title .subtitle { font-size: 13px; font-weight: 400; color: var(--text3); font-family: 'Plus Jakarta Sans', sans-serif; }
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
-  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
-  .gap-1 { gap: 1rem; }
-  .mb-1 { margin-bottom: 1rem; }
-  .mb-15 { margin-bottom: 1.5rem; }
-  .mb-2 { margin-bottom: 2rem; }
+/* ── METRIC ROW ── */
+.metric-row{display:grid;grid-template-columns:1fr 1fr;gap:.625rem;margin-bottom:.875rem;}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:.875rem .875rem .75rem;box-shadow:var(--shadow);}
+.metric-label{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+.metric-value{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;line-height:1.1;}
+.metric-value.green{color:var(--green);}
+.metric-value.red{color:var(--red);}
+.metric-sub{font-size:11px;color:var(--text3);margin-top:3px;}
 
-  /* ── METRIC ── */
-  .metric { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
-  .metric-label { font-size: 12px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px; }
-  .metric-value { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700; color: var(--text); }
-  .metric-value.green { color: var(--accent); }
-  .metric-value.red { color: var(--danger); }
-  .metric-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
+/* ── TX ITEM ── */
+.tx-list{display:flex;flex-direction:column;}
+.tx-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+.tx-item:last-child{border-bottom:none;}
+.tx-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.tx-info{flex:1;min-width:0;}
+.tx-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tx-meta{font-size:11px;color:var(--text3);margin-top:1px;display:flex;align-items:center;gap:5px;}
+.tx-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;}
+.tx-amount{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;}
+.tx-amount.in{color:var(--green);}
+.tx-amount.out{color:var(--red);}
+.tx-edit-btn{font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:0;font-family:inherit;display:none;}
+.tx-item:hover .tx-edit-btn, .tx-item:focus-within .tx-edit-btn{display:block;}
 
-  /* ── BUTTONS ── */
-  .btn {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 8px 16px;
-    border-radius: var(--radius-sm);
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all .15s;
-    border: none;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-  }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:hover { background: var(--accent-text); }
-  .btn-secondary { background: var(--surface); color: var(--text2); border: 1px solid var(--border); }
-  .btn-secondary:hover { background: var(--surface2); }
-  .btn-danger { background: var(--danger-light); color: var(--danger); }
-  .btn-danger:hover { background: #f5c6c2; }
-  .btn-sm { padding: 5px 12px; font-size: 13px; }
-  .btn-block { width: 100%; justify-content: center; padding: 11px; font-size: 15px; }
+/* ── MEMBER BADGE ── */
+.mbadge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;display:inline-flex;align-items:center;gap:2px;}
+.mbadge-ayah{background:var(--ayah-light);color:var(--ayah);}
+.mbadge-ibu{background:var(--ibu-light);color:var(--ibu);}
 
-  /* ── FORM ── */
-  .form-group { margin-bottom: 14px; }
-  .form-label { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 5px; display: block; }
-  .form-control {
-    width: 100%;
-    padding: 9px 12px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: 14px;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    background: var(--surface);
-    color: var(--text);
-    transition: border-color .15s;
-  }
-  .form-control:focus { outline: none; border-color: var(--accent); }
-  select.form-control { cursor: pointer; }
+/* ── PROGRESS BAR ── */
+.bar-track{height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;margin:5px 0;}
+.bar-fill{height:100%;border-radius:4px;transition:width .4s ease;}
 
-  /* ── TYPE TOGGLE ── */
-  .type-toggle { display: flex; gap: 6px; margin-bottom: 16px; }
-  .type-btn {
-    flex: 1; padding: 8px; border-radius: var(--radius-sm);
-    font-size: 14px; font-weight: 600; cursor: pointer;
-    border: 1.5px solid var(--border); background: var(--surface);
-    color: var(--text2); transition: all .15s; text-align: center;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-  }
-  .type-btn.active-expense { border-color: var(--danger); background: var(--danger-light); color: var(--danger); }
-  .type-btn.active-income { border-color: var(--accent); background: var(--accent-light); color: var(--accent-text); }
+/* ── FORM ── */
+.form-group{margin-bottom:12px;}
+.form-label{font-size:12px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px;}
+.form-control{width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;background:var(--surface);color:var(--text);transition:border-color .15s;-webkit-appearance:none;}
+.form-control:focus{outline:none;border-color:var(--green);}
+textarea.form-control{resize:vertical;min-height:90px;}
 
-  /* ── TRANSACTIONS ── */
-  .tx-list { display: flex; flex-direction: column; gap: 0; }
-  .tx-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 12px 0;
-    border-bottom: 1px solid var(--border);
-  }
-  .tx-item:last-child { border-bottom: none; }
-  .tx-icon {
-    width: 38px; height: 38px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 17px; flex-shrink: 0;
-  }
-  .tx-info { flex: 1; min-width: 0; }
-  .tx-name { font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tx-meta { font-size: 12px; color: var(--text3); margin-top: 1px; }
-  .tx-amount { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; flex-shrink: 0; }
-  .tx-amount.in { color: var(--accent); }
-  .tx-amount.out { color: var(--danger); }
-  .tx-del { background: none; border: none; cursor: pointer; color: var(--text3); padding: 4px; border-radius: 6px; font-size: 16px; opacity: 0; transition: opacity .15s; }
-  .tx-edit { background: var(--blue-light); border: none; cursor: pointer; color: var(--blue); padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; opacity: 0; transition: opacity .15s; font-family: inherit; }
-  .tx-item:hover .tx-edit { opacity: 1; }
-  .tx-item:hover .tx-del { opacity: 1; }
+/* ── TYPE TOGGLE ── */
+.type-toggle{display:flex;gap:6px;margin-bottom:14px;}
+.type-btn{flex:1;padding:9px;border-radius:var(--r-sm);font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--surface);color:var(--text2);transition:all .15s;font-family:inherit;}
+.type-btn.ae{border-color:var(--red);background:var(--red-light);color:var(--red);}
+.type-btn.ai{border-color:var(--green);background:var(--green-light);color:var(--green);}
 
-  /* ── AI UPLOAD ── */
-  .upload-zone {
-    border: 2px dashed var(--border);
-    border-radius: var(--radius);
-    padding: 2rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all .2s;
-    position: relative;
-  }
-  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: var(--accent-light); }
-  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-  .upload-icon { font-size: 2.5rem; margin-bottom: .5rem; }
-  .upload-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
-  .upload-sub { font-size: 13px; color: var(--text3); }
+/* ── MEMBER TOGGLE ── */
+.member-toggle{display:flex;gap:6px;margin-bottom:14px;}
+.mem-btn{flex:1;padding:8px;border-radius:var(--r-sm);font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--surface);color:var(--text2);transition:all .15s;font-family:inherit;}
+.mem-btn.ma{border-color:var(--ayah);background:var(--ayah-bg);color:var(--ayah);}
+.mem-btn.mi{border-color:var(--ibu);background:var(--ibu-bg);color:var(--ibu);}
 
-  .note-area {
-    width: 100%;
-    min-height: 100px;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: 14px;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    resize: vertical;
-    color: var(--text);
-    background: var(--surface);
-    transition: border-color .15s;
-  }
-  .note-area:focus { outline: none; border-color: var(--accent); }
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 16px;border-radius:var(--r-sm);font-size:14px;font-weight:700;cursor:pointer;border:none;font-family:inherit;transition:all .15s;}
+.btn-primary{background:var(--green);color:#fff;}
+.btn-primary:active{background:#156048;}
+.btn-secondary{background:var(--surface);color:var(--text2);border:1.5px solid var(--border);}
+.btn-danger{background:var(--red-light);color:var(--red);}
+.btn-block{width:100%;padding:12px;}
+.btn-sm{padding:6px 12px;font-size:12px;}
 
-  .ai-preview {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1rem 1.25rem;
-    margin-top: 1rem;
-  }
-  .ai-preview-title { font-size: 13px; font-weight: 600; color: var(--accent-text); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
-  .ai-result-item {
-    display: flex; flex-direction: column; gap: 4px;
-    padding: 10px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    margin-bottom: 8px;
-  }
-  .ai-result-item:last-child { margin-bottom: 0; }
-  .ai-result-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .ai-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
-  .ai-badge.expense { background: var(--danger-light); color: var(--danger); }
-  .ai-badge.income { background: var(--accent-light); color: var(--accent-text); }
+/* ── UPLOAD ── */
+.upload-zone{border:2px dashed var(--border);border-radius:var(--r);padding:1.5rem;text-align:center;cursor:pointer;transition:all .2s;position:relative;}
+.upload-zone:active,.upload-zone.drag{border-color:var(--green);background:var(--green-light);}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
+#imgPreview{max-width:100%;max-height:180px;object-fit:contain;border-radius:var(--r-sm);margin-top:10px;display:none;}
 
-  /* ── BUDGET TABLE ── */
-  .budget-table { width: 100%; border-collapse: collapse; }
-  .budget-table tr { border-bottom: 1px solid var(--border); }
-  .budget-table tr:last-child { border-bottom: none; }
-  .budget-table td { padding: 10px 6px; vertical-align: middle; }
-  .budget-cat-cell { display: flex; align-items: center; gap: 10px; }
-  .budget-cat-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-  .budget-cat-name { font-size: 14px; font-weight: 600; color: var(--text); }
-  .budget-amount-cell { text-align: right; }
-  .budget-inline-input {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 15px; font-weight: 700;
-    color: var(--text);
-    background: transparent;
-    border: none;
-    border-bottom: 2px solid transparent;
-    text-align: right;
-    width: 140px;
-    padding: 4px 6px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all .15s;
-  }
-  .budget-inline-input:hover { background: var(--surface2); border-bottom-color: var(--border); }
-  .budget-inline-input:focus { outline: none; background: var(--accent-light); border-bottom-color: var(--accent); cursor: text; }
-  .budget-inline-input::placeholder { color: var(--text3); font-weight: 400; font-size: 14px; }
-  .budget-spent-cell { font-size: 13px; color: var(--text3); text-align: right; min-width: 90px; }
-  .budget-status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 6px; }
+/* ── AI RESULTS ── */
+.ai-result-item{background:var(--surface2);border-radius:var(--r-sm);padding:10px;margin-bottom:8px;}
+.ai-result-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;}
+.ai-badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;}
+.ai-badge.expense{background:var(--red-light);color:var(--red);}
+.ai-badge.income{background:var(--green-light);color:var(--green);}
 
+/* ── MODAL ── */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:flex-end;justify-content:center;}
+.modal-backdrop.open{display:flex;}
+.modal{background:var(--surface);border-radius:var(--r) var(--r) 0 0;padding:1.25rem 1rem 2rem;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);}
+.modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 1rem;display:block;}
+.modal-title{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);line-height:1;}
 
-  .budget-row { margin-bottom: 16px; }
-  .budget-row:last-child { margin-bottom: 0; }
-  .budget-row-top { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; }
-  .budget-cat { font-weight: 500; }
-  .budget-numbers { color: var(--text3); font-size: 13px; }
-  .bar-track { height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
-  .bar-fill { height: 100%; border-radius: 4px; transition: width .4s ease; }
+/* ── SAVINGS ── */
+.goal-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:1rem;margin-bottom:.75rem;box-shadow:var(--shadow);}
 
-  /* ── SAVINGS ── */
-  .goal-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.25rem;
-    box-shadow: var(--shadow);
-  }
-  .goal-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
-  .goal-name { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 700; }
-  .goal-pct { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; }
-  .goal-amounts { font-size: 13px; color: var(--text3); margin-top: 8px; display: flex; justify-content: space-between; }
+/* ── BUDGET TABLE ── */
+.brow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+.brow:last-child{border-bottom:none;}
+.brow-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.brow-info{flex:1;min-width:0;}
+.brow-name{font-size:13px;font-weight:600;}
+.brow-status{font-size:11px;margin-top:1px;}
+.brow-input{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:var(--text);background:transparent;border:none;border-bottom:2px solid transparent;text-align:right;width:110px;padding:3px 4px;border-radius:4px;cursor:pointer;transition:all .15s;-webkit-appearance:none;}
+.brow-input:hover{background:var(--surface2);border-bottom-color:var(--border);}
+.brow-input:focus{outline:none;background:var(--green-light);border-bottom-color:var(--green);cursor:text;}
 
-  /* ── SPINNER ── */
-  .spinner { display: inline-block; width: 18px; height: 18px; border: 2.5px solid var(--accent-light); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+/* ── SPINNER ── */
+.spinner{display:inline-block;width:16px;height:16px;border:2.5px solid var(--green-light);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
 
-  /* ── BADGE ── */
-  .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; display: inline-block; }
-  .badge-green { background: var(--accent-light); color: var(--accent-text); }
-  .badge-red { background: var(--danger-light); color: var(--danger); }
-  .badge-blue { background: var(--blue-light); color: var(--blue); }
+/* ── TOAST ── */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--text);color:#fff;padding:9px 20px;border-radius:20px;font-size:13px;font-weight:600;box-shadow:var(--shadow-lg);z-index:300;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast.success{background:var(--green);}
+.toast.error{background:var(--red);}
 
-  /* ── EMPTY STATE ── */
-  .empty { text-align: center; padding: 2.5rem 1rem; color: var(--text3); }
-  .empty-icon { font-size: 2rem; margin-bottom: .5rem; }
-  .empty-text { font-size: 14px; }
+/* ── SECTION HEADER ── */
+.section-header{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin:1rem 0 .5rem;padding:0 2px;}
 
-  /* ── TOAST ── */
-  .toast {
-    position: fixed; bottom: 2rem; right: 2rem;
-    background: var(--text); color: #fff;
-    padding: 10px 18px; border-radius: var(--radius-sm);
-    font-size: 14px; font-weight: 500;
-    box-shadow: var(--shadow-md);
-    z-index: 999;
-    transform: translateY(20px); opacity: 0;
-    transition: all .25s;
-    pointer-events: none;
-  }
-  .toast.show { transform: translateY(0); opacity: 1; }
-  .toast.success { background: var(--accent); }
-  .toast.error { background: var(--danger); }
+/* ── EMPTY ── */
+.empty{text-align:center;padding:2rem 1rem;color:var(--text3);}
+.empty-icon{font-size:2rem;margin-bottom:.5rem;}
+.empty-text{font-size:13px;}
 
-  /* ── AI KEY PROMPT ── */
-  .api-banner {
-    background: var(--warn-light);
-    border: 1px solid #f0c060;
-    border-radius: var(--radius-sm);
-    padding: 10px 14px;
-    font-size: 13px;
-    color: var(--warn);
-    margin-bottom: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .api-banner a { color: var(--warn); font-weight: 600; }
+/* ── SETTINGS ROW ── */
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);}
+.settings-row:last-child{border-bottom:none;}
+.settings-label{font-size:14px;font-weight:600;}
+.settings-sub{font-size:12px;color:var(--text3);margin-top:1px;}
 
-  /* ── IMAGE PREVIEW ── */
-  .img-preview { max-width: 100%; max-height: 200px; object-fit: contain; border-radius: var(--radius-sm); margin-top: 10px; display: none; }
+/* ── CHART CONTAINER ── */
+.chart-wrap{position:relative;height:200px;}
 
-  /* ── DIVIDER ── */
-  .divider { border: none; border-top: 1px solid var(--border); margin: 1.25rem 0; }
+/* ── FILTER CHIPS ── */
+.filter-row{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px;scrollbar-width:none;}
+.filter-row::-webkit-scrollbar{display:none;}
+.chip{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;border:1.5px solid var(--border);background:var(--surface);color:var(--text3);cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:inherit;transition:all .15s;}
+.chip.active{background:var(--green-light);color:var(--green);border-color:var(--green);}
 
-  /* ── TAB SWITCHER FOR AI ── */
-  .input-tabs { display: flex; gap: 6px; margin-bottom: 1rem; }
-  .input-tab {
-    padding: 6px 14px; font-size: 13px; font-weight: 600;
-    border-radius: 20px; border: 1px solid var(--border);
-    background: var(--surface); color: var(--text3);
-    cursor: pointer; transition: all .15s;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-  }
-  .input-tab.active { background: var(--accent-light); color: var(--accent-text); border-color: var(--accent); }
+/* ── DIVIDER ── */
+hr.div{border:none;border-top:1px solid var(--border);margin:.875rem 0;}
 
-  @media (max-width: 900px) {
-    .layout { grid-template-columns: 1fr; }
-    .sidebar { display: none; }
-    .grid-4, .grid-3 { grid-template-columns: 1fr 1fr; }
-    .main { padding: 1rem; }
-  }
+/* ── INPUT TABS ── */
+.input-tabs{display:flex;gap:6px;margin-bottom:12px;}
+.itab{padding:6px 14px;font-size:12px;font-weight:700;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);color:var(--text3);cursor:pointer;font-family:inherit;transition:all .15s;}
+.itab.active{background:var(--green-light);color:var(--green);border-color:var(--green);}
+
+@media(min-width:600px){
+  .metric-row{grid-template-columns:repeat(4,1fr);}
+  .main{padding:1.25rem 1.25rem 90px;}
+  .modal{border-radius:var(--r);margin-bottom:1rem;align-self:center;}
+  .modal-backdrop.open{align-items:center;}
+}
 </style>
 </head>
 <body>
 
-<div class="topbar">
-  <div class="topbar-brand">Dompet<span>Keluarga</span></div>
+<!-- HEADER -->
+<header class="header">
+  <div class="brand">Dompet<span>Keluarga</span></div>
   <div class="month-nav">
-    <button onclick="changeMonth(-1)" title="Previous month">&#8249;</button>
-    <div class="month-label" id="monthLabel"></div>
-    <button onclick="changeMonth(1)" title="Next month">&#8250;</button>
+    <button onclick="changeMonth(-1)">&#8249;</button>
+    <div class="mlabel" id="monthLabel"></div>
+    <button onclick="changeMonth(1)">&#8250;</button>
   </div>
-  <div style="display:flex;gap:8px;align-items:center;">
-    <label style="font-size:12px;color:var(--text3);">API Key</label>
-    <input type="password" id="apiKeyInput" placeholder="sk-ant-..." style="width:160px;padding:5px 10px;font-size:13px;border:1px solid var(--border);border-radius:8px;font-family:inherit;background:var(--surface);color:var(--text);" onchange="saveApiKey(this.value)">
-  </div>
+</header>
+
+<!-- MEMBER TABS -->
+<div class="member-tabs">
+  <button class="member-tab active-family" id="mt-family" onclick="setMember('family',this)">
+    <div class="avatar">👨‍👩‍👧</div>
+    <span>Keluarga</span>
+  </button>
+  <button class="member-tab" id="mt-ayah" onclick="setMember('ayah',this)">
+    <div class="avatar">👨</div>
+    <span>Ayah</span>
+  </button>
+  <button class="member-tab" id="mt-ibu" onclick="setMember('ibu',this)">
+    <div class="avatar">👩</div>
+    <span>Ibu</span>
+  </button>
 </div>
 
-<div class="layout">
-  <!-- SIDEBAR -->
-  <aside class="sidebar">
-    <div class="nav-section">Menu</div>
-    <button class="nav-item active" onclick="showPage('overview',this)">
-      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-      Overview
-    </button>
-    <button class="nav-item" onclick="showPage('ai-add',this)">
-      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2z"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/></svg>
-      AI Scan
-    </button>
-    <button class="nav-item" onclick="showPage('manual-add',this)">
-      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-      Add manually
-    </button>
-    <button class="nav-item" onclick="showPage('transactions',this)">
-      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-      Transactions
-    </button>
-    <div class="nav-section">Planning</div>
-    <button class="nav-item" onclick="showPage('budget',this)">
-      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-      Budget
-    </button>
-    <button class="nav-item" onclick="showPage('savings',this)">
-      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-      Savings goals
-    </button>
-  </aside>
+<main class="main">
 
-  <!-- MAIN -->
-  <main class="main">
+  <!-- HOME -->
+  <div id="page-home" class="page active">
+    <div class="metric-row">
+      <div class="metric"><div class="metric-label">Pemasukan</div><div class="metric-value green" id="m-income">Rp0</div><div class="metric-sub">Bulan ini</div></div>
+      <div class="metric"><div class="metric-label">Pengeluaran</div><div class="metric-value red" id="m-expense">Rp0</div><div class="metric-sub">Bulan ini</div></div>
+      <div class="metric"><div class="metric-label">Saldo</div><div class="metric-value" id="m-balance">Rp0</div><div class="metric-sub">Tersisa</div></div>
+      <div class="metric"><div class="metric-label">Tabungan</div><div class="metric-value" id="m-rate">0%</div><div class="metric-sub">Dari pemasukan</div></div>
+    </div>
 
-    <!-- OVERVIEW -->
-    <div id="page-overview" class="page active">
-      <div class="grid-4 mb-15">
-        <div class="metric">
-          <div class="metric-label">Income</div>
-          <div class="metric-value green" id="m-income">Rp0</div>
-          <div class="metric-sub">This month</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Expenses</div>
-          <div class="metric-value red" id="m-expense">Rp0</div>
-          <div class="metric-sub">This month</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Balance</div>
-          <div class="metric-value" id="m-balance">Rp0</div>
-          <div class="metric-sub">Remaining</div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">Savings rate</div>
-          <div class="metric-value" id="m-rate">0%</div>
-          <div class="metric-sub">Of income</div>
+    <div class="card">
+      <div class="card-title">Pengeluaran per kategori <span class="card-sub" id="pieMonth"></span></div>
+      <div class="chart-wrap"><canvas id="pieChart"></canvas></div>
+      <div id="pieLegend" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Tren 6 bulan terakhir</div>
+      <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Transaksi terbaru <span class="card-sub" id="txCount"></span></div>
+      <div id="txRecent"></div>
+    </div>
+  </div>
+
+  <!-- TRANSACTIONS -->
+  <div id="page-tx" class="page">
+    <div class="card">
+      <div class="card-title">Semua transaksi</div>
+      <div class="filter-row" id="catFilters"></div>
+      <div style="display:flex;gap:6px;margin-bottom:10px;">
+        <select id="filterType" class="form-control" style="font-size:13px;padding:7px 10px;" onchange="renderTxFull()">
+          <option value="">Semua tipe</option>
+          <option value="expense">Pengeluaran</option>
+          <option value="income">Pemasukan</option>
+        </select>
+      </div>
+      <div id="txFull"></div>
+    </div>
+  </div>
+
+  <!-- ADD -->
+  <div id="page-add" class="page">
+    <div class="card">
+      <div class="card-title">🤖 AI Scan Struk / Nota</div>
+      <div id="apiBanner" style="display:none;background:#FEF3DC;border:1px solid #f0c060;border-radius:var(--r-sm);padding:9px 12px;font-size:12px;color:#B7770D;margin-bottom:10px;">⚠ Masukkan API Key Anthropic di Pengaturan untuk mengaktifkan AI Scan.</div>
+      <div class="input-tabs">
+        <button class="itab active" onclick="switchTab('img',this)">📷 Foto</button>
+        <button class="itab" onclick="switchTab('note',this)">📝 Ketik</button>
+      </div>
+      <div id="tab-img">
+        <div class="upload-zone" id="dropZone">
+          <input type="file" id="fileInput" accept="image/*" onchange="handleFile(this.files[0])">
+          <div style="font-size:2rem;margin-bottom:.5rem;">🧾</div>
+          <div style="font-weight:700;font-size:14px;margin-bottom:3px;">Foto struk atau nota</div>
+          <div style="font-size:12px;color:var(--text3);">Ketuk untuk pilih foto dari galeri</div>
+          <img id="imgPreview" alt="Preview">
         </div>
       </div>
-
-      <div class="grid-2 mb-15">
-        <div class="card">
-          <div class="card-title">Spending breakdown</div>
-          <div style="position:relative;height:240px;"><canvas id="pieChart" role="img" aria-label="Spending by category pie chart">No data yet.</canvas></div>
-          <div id="pieLegend" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;font-size:12px;"></div>
-        </div>
-        <div class="card">
-          <div class="card-title">Monthly trend <span class="subtitle">Last 6 months</span></div>
-          <div style="position:relative;height:240px;"><canvas id="barChart" role="img" aria-label="Monthly income vs expenses bar chart">No data.</canvas></div>
-        </div>
+      <div id="tab-note" style="display:none;">
+        <textarea id="noteInput" class="form-control" placeholder="Contoh: Beli sembako 150 ribu, bayar listrik PLN 350.000, gaji masuk 5 juta..."></textarea>
       </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;">
+        <select id="aiMember" class="form-control" style="width:auto;font-size:13px;padding:8px 10px;">
+          <option value="ayah">👨 Ayah</option>
+          <option value="ibu">👩 Ibu</option>
+        </select>
+        <button class="btn btn-primary" onclick="runAI()" id="scanBtn" style="flex:1;">Scan & Ekstrak</button>
+        <span id="scanStatus" style="font-size:12px;color:var(--text3);width:100%;"></span>
+      </div>
+    </div>
 
+    <div id="aiResults" style="display:none;">
       <div class="card">
-        <div class="card-title">
-          Recent transactions
-          <span class="subtitle" id="txCount"></span>
-        </div>
-        <div id="txList"><div class="empty"><div class="empty-icon">📋</div><div class="empty-text">No transactions yet. Use AI Scan or Add manually to get started.</div></div></div>
+        <div class="card-title">Hasil ekstrak AI <button class="btn btn-sm btn-secondary" onclick="clearAI()">Hapus</button></div>
+        <div id="aiResultItems"></div>
+        <hr class="div">
+        <button class="btn btn-primary btn-block" onclick="addAllExtracted()">✅ Tambah semua ke anggaran</button>
       </div>
     </div>
 
-    <!-- AI SCAN PAGE -->
-    <div id="page-ai-add" class="page">
-      <div class="card mb-1">
-        <div class="card-title">
-          🤖 AI Scan — extract from receipt or note
-        </div>
-        <div id="apiBanner" class="api-banner" style="display:none;">
-          ⚠️ Enter your Anthropic API key in the top-right corner to enable AI analysis.
-        </div>
+    <div class="card">
+      <div class="card-title">✏️ Tambah manual</div>
+      <div class="type-toggle">
+        <button class="type-btn ae" id="btnExpense" onclick="setType('expense')">💸 Pengeluaran</button>
+        <button class="type-btn" id="btnIncome" onclick="setType('income')">💵 Pemasukan</button>
+      </div>
+      <div class="member-toggle">
+        <button class="mem-btn ma" id="mbtnAyah" onclick="setAddMember('ayah')">👨 Ayah</button>
+        <button class="mem-btn" id="mbtnIbu" onclick="setAddMember('ibu')">👩 Ibu</button>
+      </div>
+      <div class="form-group"><label class="form-label">Keterangan</label><input type="text" id="mDesc" class="form-control" placeholder="cth: Beli bensin, Gaji masuk"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group"><label class="form-label">Jumlah (Rp)</label><input type="number" id="mAmount" class="form-control" placeholder="0" min="0"></div>
+        <div class="form-group"><label class="form-label">Tanggal</label><input type="date" id="mDate" class="form-control"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Kategori</label><select id="mCat" class="form-control"></select></div>
+      <button class="btn btn-primary btn-block" onclick="addManual()">Tambah transaksi</button>
+    </div>
+  </div>
 
-        <div class="input-tabs">
-          <button class="input-tab active" onclick="switchInputTab('image', this)">📷 Upload image</button>
-          <button class="input-tab" onclick="switchInputTab('note', this)">📝 Type note</button>
-        </div>
-
-        <!-- Image tab -->
-        <div id="tab-image">
-          <div class="upload-zone" id="dropZone">
-            <input type="file" id="fileInput" accept="image/*" onchange="handleFile(this.files[0])">
-            <div class="upload-icon">🧾</div>
-            <div class="upload-title">Drop receipt or bill here</div>
-            <div class="upload-sub">or click to choose a photo from your device</div>
-            <img id="imgPreview" class="img-preview" alt="Preview">
-          </div>
-        </div>
-
-        <!-- Note tab -->
-        <div id="tab-note" style="display:none;">
-          <textarea class="note-area" id="noteInput" placeholder="Describe your transaction in natural language. For example:
-• 'Bought groceries at Indomaret, spent 150 ribu'
-• 'Received salary 5 juta from company ABC'
-• 'Paid PLN electricity bill 350.000, Indihome 180.000'
-• Paste text copied from a receipt or e-statement"></textarea>
-        </div>
-
-        <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <button class="btn btn-primary" onclick="runAI()" id="scanBtn">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
-            Scan & extract
-          </button>
-          <span id="scanStatus" style="font-size:13px;color:var(--text3);"></span>
+  <!-- BUDGET -->
+  <div id="page-budget" class="page">
+    <div class="card">
+      <div class="card-title">Anggaran bulanan <button class="btn btn-sm btn-secondary" onclick="toggleCatPanel()">⚙ Kelola kategori</button></div>
+      <div id="catPanel" style="display:none;background:var(--surface2);border-radius:var(--r-sm);padding:.875rem;margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Ketuk nama/emoji untuk mengedit</div>
+        <div id="catManageList"></div>
+        <div style="display:flex;gap:6px;margin-top:10px;">
+          <input type="text" id="newCatEmoji" placeholder="😀" maxlength="2" style="width:42px;text-align:center;padding:7px;font-size:15px;border:1.5px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text);">
+          <input type="text" id="newCatName" class="form-control" placeholder="Nama kategori baru" style="flex:1;">
+          <button class="btn btn-primary btn-sm" onclick="addCategory()">+ Add</button>
         </div>
       </div>
-
-      <!-- AI Results -->
-      <div id="aiResults" style="display:none;">
-        <div class="card">
-          <div class="card-title">
-            Extracted transactions
-            <button class="btn btn-sm btn-secondary" onclick="clearAI()">Clear</button>
-          </div>
-          <div id="aiResultItems"></div>
-          <hr class="divider">
-          <button class="btn btn-primary btn-block" id="addAllBtn" onclick="addAllExtracted()">
-            ✅ Add all to budget
-          </button>
-        </div>
+      <div id="budgetTable"></div>
+      <hr class="div">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:13px;color:var(--text3);font-weight:600;">Total anggaran</span>
+        <span id="totalBudget" style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;">Rp0</span>
       </div>
     </div>
-
-    <!-- MANUAL ADD -->
-    <div id="page-manual-add" class="page">
-      <div class="card" style="max-width:520px;">
-        <div class="card-title">Add transaction manually</div>
-        <div class="type-toggle">
-          <button class="type-btn active-expense" id="btnExpense" onclick="setType('expense')">💸 Expense</button>
-          <button class="type-btn" id="btnIncome" onclick="setType('income')">💵 Income</button>
-        </div>
-        <div class="grid-2">
-          <div class="form-group">
-            <label class="form-label">Description</label>
-            <input type="text" id="mDesc" class="form-control" placeholder="e.g. Grocery Alfamart">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Amount (Rp)</label>
-            <input type="number" id="mAmount" class="form-control" placeholder="0" min="0">
-          </div>
-        </div>
-        <div class="grid-2">
-          <div class="form-group">
-            <label class="form-label">Category</label>
-            <select id="mCat" class="form-control">
-              <option value="Food">🍽 Food & Groceries</option>
-              <option value="Transport">🚗 Transport</option>
-              <option value="Bills">💡 Bills & Utilities</option>
-              <option value="Health">🏥 Health</option>
-              <option value="Education">📚 Education</option>
-              <option value="Shopping">🛍 Shopping</option>
-              <option value="Entertainment">🎉 Entertainment</option>
-              <option value="Savings">💰 Savings</option>
-              <option value="Income">💵 Income</option>
-              <option value="Other">📌 Other</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Date</label>
-            <input type="date" id="mDate" class="form-control">
-          </div>
-        </div>
-        <button class="btn btn-primary btn-block" onclick="addManual()">Add transaction</button>
-      </div>
+    <div class="card">
+      <div class="card-title">Anggaran vs aktual</div>
+      <div id="budgetBars"></div>
     </div>
+  </div>
 
-    <!-- TRANSACTIONS -->
-    <div id="page-transactions" class="page">
-      <div class="card">
-        <div class="card-title">
-          All transactions — <span id="txMonthLabel2"></span>
-          <div style="display:flex;gap:8px;">
-            <select id="filterCat" class="form-control" style="width:auto;font-size:13px;padding:5px 10px;" onchange="renderTransactions()">
-              <option value="">All categories</option>
-            </select>
-            <select id="filterType" class="form-control" style="width:auto;font-size:13px;padding:5px 10px;" onchange="renderTransactions()">
-              <option value="">All types</option>
-              <option value="expense">Expense</option>
-              <option value="income">Income</option>
-            </select>
-          </div>
-        </div>
-        <div id="txListFull"></div>
+  <!-- MORE -->
+  <div id="page-more" class="page">
+    <!-- Savings Goals -->
+    <div class="section-header">🎯 Target tabungan</div>
+    <div class="card">
+      <div class="form-group"><label class="form-label">Nama target</label><input type="text" id="gName" class="form-control" placeholder="cth: Liburan, Dana darurat"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group"><label class="form-label">Target (Rp)</label><input type="number" id="gTarget" class="form-control" min="0"></div>
+        <div class="form-group"><label class="form-label">Sudah ditabung (Rp)</label><input type="number" id="gSaved" class="form-control" min="0"></div>
       </div>
+      <button class="btn btn-primary btn-block" onclick="addGoal()">Buat target</button>
     </div>
+    <div id="goalsList"></div>
 
-    <!-- BUDGET -->
-    <div id="page-budget" class="page">
-      <div class="card mb-15">
-        <div class="card-title">
-          Monthly budgets
-          <button class="btn btn-sm btn-secondary" onclick="toggleManageCats()" id="manageCatsBtn">⚙ Manage categories</button>
-        </div>
-
-        <!-- Manage categories panel -->
-        <div id="manageCatsPanel" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:1rem;margin-bottom:1rem;">
-          <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:10px;">Categories — click emoji or name to edit, drag to reorder</div>
-          <div id="catManageList"></div>
-          <div style="display:flex;gap:8px;margin-top:12px;align-items:center;">
-            <input type="text" id="newCatEmoji" placeholder="😀" maxlength="2" style="width:48px;padding:7px;font-size:16px;text-align:center;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);">
-            <input type="text" id="newCatName" placeholder="New category name" class="form-control" style="flex:1;">
-            <button class="btn btn-primary btn-sm" onclick="addCategory()">+ Add</button>
-          </div>
-        </div>
-
-        <div id="budgetTable"></div>
-        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:13px;color:var(--text3);">Total budget</span>
-          <span id="totalBudget" style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:var(--text);">Rp0</span>
-        </div>
+    <!-- Settings -->
+    <div class="section-header">⚙️ Pengaturan</div>
+    <div class="card">
+      <div class="settings-row">
+        <div><div class="settings-label">API Key Anthropic</div><div class="settings-sub">Untuk fitur AI Scan struk</div></div>
       </div>
-      <div class="card">
-        <div class="card-title">Budget vs actual spending</div>
-        <div id="budgetBars"><div class="empty"><div class="empty-icon">📊</div><div class="empty-text">Set budgets above to track your spending.</div></div></div>
-      </div>
+      <input type="password" id="apiKeyInput" class="form-control" placeholder="sk-ant-..." onchange="saveApiKey(this.value)" style="margin-bottom:0;">
     </div>
+  </div>
 
-    <!-- SAVINGS -->
-    <div id="page-savings" class="page">
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-title">New savings goal</div>
-          <div class="form-group"><label class="form-label">Goal name</label><input type="text" id="gName" class="form-control" placeholder="e.g. Vacation, Emergency Fund"></div>
-          <div class="form-group"><label class="form-label">Target amount (Rp)</label><input type="number" id="gTarget" class="form-control" placeholder="0" min="0"></div>
-          <div class="form-group"><label class="form-label">Already saved (Rp)</label><input type="number" id="gSaved" class="form-control" placeholder="0" min="0"></div>
-          <button class="btn btn-primary btn-block" onclick="addGoal()">Create goal</button>
-        </div>
-        <div>
-          <div id="goalsList"></div>
-        </div>
-      </div>
+</main>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" id="nb-home" onclick="showPage('home',this)">
+    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    Beranda
+  </button>
+  <button class="nav-btn" id="nb-tx" onclick="showPage('tx',this)">
+    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    Transaksi
+  </button>
+  <button class="nav-btn" id="nb-add" onclick="showPage('add',this)" style="position:relative;">
+    <div style="position:absolute;top:-14px;width:48px;height:48px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(29,138,94,.4);">
+      <svg width="22" height="22" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     </div>
-
-  </main>
-</div>
+    <span style="margin-top:22px;">Tambah</span>
+  </button>
+  <button class="nav-btn" id="nb-budget" onclick="showPage('budget',this)">
+    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+    Anggaran
+  </button>
+  <button class="nav-btn" id="nb-more" onclick="showPage('more',this)">
+    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+    Lainnya
+  </button>
+</nav>
 
 <!-- EDIT MODAL -->
-<div id="editModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;display:none;align-items:center;justify-content:center;">
-  <div style="background:var(--surface);border-radius:var(--radius);padding:1.5rem;width:90%;max-width:460px;box-shadow:var(--shadow-md);position:relative;">
-    <div style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;margin-bottom:1.25rem;display:flex;justify-content:space-between;align-items:center;">
-      Edit transaction
-      <button onclick="closeEditModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);line-height:1;">✕</button>
+<div class="modal-backdrop" id="editModal" onclick="if(event.target===this)closeEdit()">
+  <div class="modal">
+    <span class="modal-handle"></span>
+    <div class="modal-title">Edit transaksi <button class="modal-close" onclick="closeEdit()">✕</button></div>
+    <div class="type-toggle">
+      <button class="type-btn ae" id="eBtnExp" onclick="setEditType('expense')">💸 Pengeluaran</button>
+      <button class="type-btn" id="eBtnInc" onclick="setEditType('income')">💵 Pemasukan</button>
     </div>
-    <div class="type-toggle" style="margin-bottom:14px;">
-      <button class="type-btn active-expense" id="editBtnExpense" onclick="setEditType('expense')">💸 Expense</button>
-      <button class="type-btn" id="editBtnIncome" onclick="setEditType('income')">💵 Income</button>
+    <div class="member-toggle">
+      <button class="mem-btn ma" id="eBtnAyah" onclick="setEditMember('ayah')">👨 Ayah</button>
+      <button class="mem-btn" id="eBtnIbu" onclick="setEditMember('ibu')">👩 Ibu</button>
     </div>
-    <div class="grid-2">
-      <div class="form-group">
-        <label class="form-label">Description</label>
-        <input type="text" id="editDesc" class="form-control">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Amount (Rp)</label>
-        <input type="number" id="editAmount" class="form-control" min="0">
-      </div>
+    <div class="form-group"><label class="form-label">Keterangan</label><input type="text" id="eDesc" class="form-control"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group"><label class="form-label">Jumlah (Rp)</label><input type="number" id="eAmount" class="form-control" min="0"></div>
+      <div class="form-group"><label class="form-label">Tanggal</label><input type="date" id="eDate" class="form-control"></div>
     </div>
-    <div class="grid-2">
-      <div class="form-group">
-        <label class="form-label">Category</label>
-        <select id="editCat" class="form-control"></select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Date</label>
-        <input type="date" id="editDate" class="form-control">
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:4px;">
-      <button class="btn btn-danger" style="flex:0;" onclick="deleteTxFromModal()">🗑 Delete</button>
-      <button class="btn btn-secondary" style="flex:1;" onclick="closeEditModal()">Cancel</button>
-      <button class="btn btn-primary" style="flex:1;" onclick="saveEditTx()">Save changes</button>
+    <div class="form-group"><label class="form-label">Kategori</label><select id="eCat" class="form-control"></select></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-danger" onclick="deleteFromEdit()">🗑 Hapus</button>
+      <button class="btn btn-secondary" style="flex:1;" onclick="closeEdit()">Batal</button>
+      <button class="btn btn-primary" style="flex:1;" onclick="saveEdit()">Simpan</button>
     </div>
   </div>
 </div>
 
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
 <script>
-// ── STATE ──
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const DEFAULT_CATS = ['Food','Transport','Bills','Health','Education','Shopping','Entertainment','Savings','Income','Other'];
-const DEFAULT_EMOJI = {Food:'🍽',Transport:'🚗',Bills:'💡',Health:'🏥',Education:'📚',Shopping:'🛍',Entertainment:'🎉',Savings:'💰',Income:'💵',Other:'📌'};
-const CAT_COLORS = ['#2D6A4F','#1A5F9E','#B7770D','#C0392B','#7B68EE','#E67E22','#16A085','#8E44AD','#27AE60','#7F8C8D','#D35400','#1ABC9C','#8E44AD','#2980B9'];
-let CATS = JSON.parse(localStorage.getItem('dk_cats') || JSON.stringify(["Food", "Transport", "Transport Car", "Transport Motor", "Home debt", "Electricity", "Water", "Internet", "Utilities", "Shopping", "Child milk", "Personal", "Personal shopping", "Gifts", "Parents", "Wife", "Holiday", "Dinner", "Breakfast", "Repair House", "Others", "Cashout", "E-money", "Arisan", "Zumba", "Qurban", "Hutang", "Posyandu", "Income"]));
-let CAT_EMOJI = JSON.parse(localStorage.getItem('dk_emoji') || JSON.stringify({"Food": "\ud83c\udf7d", "Transport": "\ud83d\ude8c", "Transport Car": "\ud83d\ude97", "Transport Motor": "\ud83c\udfcd", "Home debt": "\ud83c\udfe0", "Electricity": "\u26a1", "Water": "\ud83d\udca7", "Internet": "\ud83d\udce1", "Utilities": "\ud83d\uddd1", "Shopping": "\ud83d\udecd", "Child milk": "\ud83c\udf7c", "Personal": "\ud83d\udc64", "Personal shopping": "\ud83d\udc5c", "Gifts": "\ud83c\udf81", "Parents": "\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67", "Wife": "\ud83d\udc91", "Holiday": "\ud83c\udf34", "Dinner": "\ud83c\udf19", "Breakfast": "\u2600\ufe0f", "Repair House": "\ud83d\udd27", "Others": "\ud83d\udccc", "Cashout": "\ud83d\udcb8", "E-money": "\ud83d\udcb3", "Arisan": "\ud83e\udd1d", "Zumba": "\ud83d\udc83", "Qurban": "\ud83d\udc11", "Hutang": "\ud83d\udccb", "Posyandu": "\ud83d\udc76", "Income": "\ud83d\udcb5"}));
+// ── DATA ──
+const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const DEFAULT_CATS = ["Food","Transport","Transport Car","Transport Motor","Home debt","Electricity","Water","Internet","Utilities","Shopping","Child milk","Personal","Personal shopping","Gifts","Parents","Wife","Holiday","Dinner","Breakfast","Repair House","Others","Cashout","E-money","Arisan","Zumba","Qurban","Hutang","Posyandu","Income"];
+const DEFAULT_EMOJI = {"Food":"🍽","Transport":"🚌","Transport Car":"🚗","Transport Motor":"🏍","Home debt":"🏠","Electricity":"⚡","Water":"💧","Internet":"📡","Utilities":"🗑","Shopping":"🛍","Child milk":"🍼","Personal":"👤","Personal shopping":"👜","Gifts":"🎁","Parents":"👨‍👩‍👧","Wife":"💑","Holiday":"🌴","Dinner":"🌙","Breakfast":"☀️","Repair House":"🔧","Others":"📌","Cashout":"💸","E-money":"💳","Arisan":"🤝","Zumba":"💃","Qurban":"🐑","Hutang":"📋","Posyandu":"👶","Income":"💵"};
+const CAT_COLORS = ["#1D8A5E","#1759A8","#B7770D","#C73535","#7B68EE","#E67E22","#16A085","#8E44AD","#27AE60","#7F8C8D","#D35400","#1ABC9C","#2980B9","#E84393","#F39C12","#2ECC71","#3498DB","#9B59B6","#E74C3C","#1ABC9C","#95A5A6","#E67E22","#16A085","#2C3E50","#8E44AD"];
 
-let now = new Date();
-let curYear = now.getFullYear(), curMonth = now.getMonth();
+let CATS = JSON.parse(localStorage.getItem('dk_cats') || JSON.stringify(DEFAULT_CATS));
+let CAT_EMOJI = JSON.parse(localStorage.getItem('dk_emoji') || JSON.stringify(DEFAULT_EMOJI));
 let transactions = JSON.parse(localStorage.getItem('dk_tx') || '[]');
 let budgets = JSON.parse(localStorage.getItem('dk_budgets') || '{}');
 let goals = JSON.parse(localStorage.getItem('dk_goals') || '[]');
-let txType = 'expense';
+
+let curYear = new Date().getFullYear(), curMonth = new Date().getMonth();
+let curMember = 'family'; // family | ayah | ibu
+let txType = 'expense', addMember = 'ayah';
+let editingId = null, editTxType = 'expense', editMemberVal = 'ayah';
 let pieInst = null, barInst = null;
-let extractedItems = [];
-let currentImageBase64 = null;
-let currentImageType = null;
+let extractedItems = [], curImgB64 = null, curImgType = null;
+let filterCat = '';
 
 function save() {
   localStorage.setItem('dk_tx', JSON.stringify(transactions));
@@ -818,10 +521,10 @@ function save() {
   localStorage.setItem('dk_cats', JSON.stringify(CATS));
   localStorage.setItem('dk_emoji', JSON.stringify(CAT_EMOJI));
 }
-function saveApiKey(v) { localStorage.setItem('dk_apikey', v); }
-function getApiKey() { return localStorage.getItem('dk_apikey') || document.getElementById('apiKeyInput').value; }
-function fmt(n) { return 'Rp' + Math.round(n).toLocaleString('id-ID'); }
-function fmtShort(n) { if(n>=1e9) return 'Rp'+(n/1e9).toFixed(1)+'M'; if(n>=1e6) return 'Rp'+(n/1e6).toFixed(1)+'jt'; return fmt(n); }
+function saveApiKey(v){localStorage.setItem('dk_apikey',v);}
+function getApiKey(){return localStorage.getItem('dk_apikey')||document.getElementById('apiKeyInput').value;}
+function fmt(n){return'Rp'+Math.round(n).toLocaleString('id-ID');}
+function fmtS(n){if(n>=1e9)return'Rp'+(n/1e9).toFixed(1)+'M';if(n>=1e6)return'Rp'+(n/1e6).toFixed(1)+'jt';if(n>=1e3)return'Rp'+(n/1e3).toFixed(0)+'rb';return fmt(n);}
 
 // ── INIT ──
 window.addEventListener('load', () => {
@@ -829,18 +532,34 @@ window.addEventListener('load', () => {
   if(k) document.getElementById('apiKeyInput').value = k;
   document.getElementById('mDate').value = new Date().toISOString().slice(0,10);
 
-  // Merge spreadsheet data (only add entries not already present by id)
-  const preloaded = [{"id": 1000000, "desc": "Cicilan hutang", "amount": 190000, "cat": "Shopping", "date": "2026-04-24", "type": "expense"}, {"id": 1000001, "desc": "Milk and hat", "amount": 302000, "cat": "Child milk", "date": "2026-04-24", "type": "expense"}, {"id": 1000002, "desc": "Ibun", "amount": 500000, "cat": "Wife", "date": "2026-04-25", "type": "expense"}, {"id": 1000003, "desc": "Pelampung, Kacamata, Jemuran", "amount": 150000, "cat": "Shopping", "date": "2026-04-25", "type": "expense"}, {"id": 1000004, "desc": "Orang tua", "amount": 650000, "cat": "Gifts", "date": "2026-04-25", "type": "expense"}, {"id": 1000005, "desc": "IPL Khalas", "amount": 100000, "cat": "Utilities", "date": "2026-04-25", "type": "expense"}, {"id": 1000006, "desc": "Car petrol", "amount": 100000, "cat": "Transport Car", "date": "2026-04-25", "type": "expense"}, {"id": 1000007, "desc": "Soto", "amount": 15000, "cat": "Food", "date": "2026-04-25", "type": "expense"}, {"id": 1000008, "desc": "Lazatto Chicken", "amount": 16000, "cat": "Food", "date": "2026-04-25", "type": "expense"}, {"id": 1000009, "desc": "Mini Soccer", "amount": 15000, "cat": "Personal", "date": "2026-04-25", "type": "expense"}, {"id": 1000010, "desc": "Makan", "amount": 18000, "cat": "Personal", "date": "2026-04-26", "type": "expense"}, {"id": 1000011, "desc": "Es buah", "amount": 10000, "cat": "Food", "date": "2026-04-26", "type": "expense"}, {"id": 1000012, "desc": "Ayam bakar", "amount": 16000, "cat": "Food", "date": "2026-04-25", "type": "expense"}, {"id": 1000013, "desc": "Sate taichan", "amount": 40000, "cat": "Food", "date": "2026-04-25", "type": "expense"}, {"id": 1000014, "desc": "Basreng and es", "amount": 10000, "cat": "Food", "date": "2026-04-25", "type": "expense"}, {"id": 1000015, "desc": "Lele and Es", "amount": 18000, "cat": "Food", "date": "2026-04-26", "type": "expense"}, {"id": 1000016, "desc": "Parking", "amount": 2000, "cat": "Parking", "date": "2026-04-26", "type": "expense"}, {"id": 1000017, "desc": "PBB", "amount": 250000, "cat": "Home debt", "date": "2026-04-26", "type": "expense"}, {"id": 1000018, "desc": "Electricity", "amount": 200000, "cat": "Electricity", "date": "2026-04-26", "type": "expense"}, {"id": 1000019, "desc": "BTN", "amount": 4250000, "cat": "Home debt", "date": "2026-04-27", "type": "expense"}, {"id": 1000020, "desc": "Makan siang", "amount": 25000, "cat": "Personal", "date": "2026-04-27", "type": "expense"}, {"id": 1000021, "desc": "Jajan sore", "amount": 5000, "cat": "Personal", "date": "2026-04-27", "type": "expense"}, {"id": 1000022, "desc": "Jajan", "amount": 5000, "cat": "Personal", "date": "2026-04-28", "type": "expense"}, {"id": 1000023, "desc": "Makan malam", "amount": 20000, "cat": "Food", "date": "2026-04-28", "type": "expense"}, {"id": 1000024, "desc": "Nasi Goreng", "amount": 31000, "cat": "Food", "date": "2026-04-29", "type": "expense"}, {"id": 1000025, "desc": "Mendoan", "amount": 10000, "cat": "Personal", "date": "2026-04-30", "type": "expense"}, {"id": 1000026, "desc": "Admin", "amount": 3000, "cat": "Personal", "date": "2026-04-30", "type": "expense"}, {"id": 1000027, "desc": "Cashout", "amount": 300000, "cat": "Cashout", "date": "2026-04-30", "type": "expense"}, {"id": 1000028, "desc": "Cashout", "amount": 200000, "cat": "Cashout", "date": "2026-04-24", "type": "expense"}, {"id": 1000029, "desc": "Salary - Ayah", "amount": 9400000, "cat": "Income", "date": "2026-04-24", "type": "income"}, {"id": 1000030, "desc": "Mie ayam", "amount": 25000, "cat": "Food", "date": "2026-05-01", "type": "expense"}, {"id": 1000031, "desc": "Holiday Petrol Anyer", "amount": 200000, "cat": "Transport Car", "date": "2026-05-02", "type": "expense"}, {"id": 1000032, "desc": "Urunan", "amount": 150000, "cat": "Utilities", "date": "2026-05-03", "type": "expense"}, {"id": 1000033, "desc": "Frozen", "amount": 37000, "cat": "Food", "date": "2026-05-03", "type": "expense"}, {"id": 1000034, "desc": "Maranggi", "amount": 45000, "cat": "Food", "date": "2026-05-03", "type": "expense"}, {"id": 1000035, "desc": "Jajan", "amount": 16000, "cat": "Personal", "date": "2026-05-04", "type": "expense"}, {"id": 1000036, "desc": "Cotton bud and knife beard", "amount": 20000, "cat": "Personal", "date": "2026-05-04", "type": "expense"}, {"id": 1000037, "desc": "Car petrol", "amount": 100000, "cat": "Transport Car", "date": "2026-05-04", "type": "expense"}, {"id": 1000038, "desc": "Jajan malam", "amount": 50000, "cat": "Food", "date": "2026-05-05", "type": "expense"}, {"id": 1000039, "desc": "Jajan malam", "amount": 50000, "cat": "Food", "date": "2026-05-06", "type": "expense"}, {"id": 1000040, "desc": "Cuci motor", "amount": 20000, "cat": "Personal", "date": "2026-05-07", "type": "expense"}, {"id": 1000041, "desc": "Jajan", "amount": 5000, "cat": "Personal", "date": "2026-05-07", "type": "expense"}, {"id": 1000042, "desc": "Susu", "amount": 36000, "cat": "Child milk", "date": "2026-05-08", "type": "expense"}, {"id": 1000043, "desc": "Jajan", "amount": 20000, "cat": "Personal", "date": "2026-05-08", "type": "expense"}, {"id": 1000044, "desc": "Motor petrol", "amount": 35000, "cat": "Transport Motor", "date": "2026-05-08", "type": "expense"}, {"id": 1000045, "desc": "Internet", "amount": 50000, "cat": "Internet", "date": "2026-05-09", "type": "expense"}, {"id": 1000046, "desc": "Plat Nomor", "amount": 35000, "cat": "Personal", "date": "2026-05-09", "type": "expense"}, {"id": 1000047, "desc": "Meatball with big family", "amount": 90000, "cat": "Food", "date": "2026-05-09", "type": "expense"}, {"id": 1000048, "desc": "Water galon", "amount": 21000, "cat": "Food", "date": "2026-05-10", "type": "expense"}, {"id": 1000049, "desc": "Lazatto Chicken", "amount": 13000, "cat": "Food", "date": "2026-05-10", "type": "expense"}, {"id": 1000050, "desc": "Car petrol", "amount": 150000, "cat": "Transport Car", "date": "2026-05-10", "type": "expense"}, {"id": 1000051, "desc": "Hair Cut", "amount": 35000, "cat": "Personal", "date": "2026-05-10", "type": "expense"}, {"id": 1000052, "desc": "Watermelon", "amount": 25000, "cat": "Food", "date": "2026-05-10", "type": "expense"}, {"id": 1000053, "desc": "Chicken Kremes", "amount": 21000, "cat": "Food", "date": "2026-05-10", "type": "expense"}, {"id": 1000054, "desc": "Water", "amount": 73000, "cat": "Water", "date": "2026-05-11", "type": "expense"}, {"id": 1000055, "desc": "PBB Khalas", "amount": 151000, "cat": "Home debt", "date": "2026-05-11", "type": "expense"}, {"id": 1000056, "desc": "Sate", "amount": 20000, "cat": "Food", "date": "2026-05-11", "type": "expense"}, {"id": 1000057, "desc": "Jajan", "amount": 13000, "cat": "Personal", "date": "2026-05-11", "type": "expense"}, {"id": 1000058, "desc": "Jajan", "amount": 15000, "cat": "Personal", "date": "2026-05-12", "type": "expense"}, {"id": 1000059, "desc": "Lele plus nasi goreng", "amount": 28000, "cat": "Food", "date": "2026-05-13", "type": "expense"}, {"id": 1000060, "desc": "Martabak", "amount": 30000, "cat": "Food", "date": "2026-05-13", "type": "expense"}, {"id": 1000061, "desc": "Kue for friends", "amount": 60000, "cat": "Food", "date": "2026-05-14", "type": "expense"}, {"id": 1000062, "desc": "Dkriuk", "amount": 14000, "cat": "Food", "date": "2026-05-14", "type": "expense"}, {"id": 1000063, "desc": "Haus", "amount": 34000, "cat": "Food", "date": "2026-05-14", "type": "expense"}, {"id": 1000064, "desc": "Milk", "amount": 335000, "cat": "Child milk", "date": "2026-05-14", "type": "expense"}, {"id": 1000065, "desc": "Cakwe and Sate Padang", "amount": 25000, "cat": "Food", "date": "2026-05-14", "type": "expense"}, {"id": 1000066, "desc": "Admin", "amount": 10000, "cat": "Personal", "date": "2026-05-15", "type": "expense"}, {"id": 1000067, "desc": "Electricity", "amount": 200000, "cat": "Electricity", "date": "2026-05-16", "type": "expense"}, {"id": 1000068, "desc": "E-money", "amount": 20000, "cat": "E-money", "date": "2026-05-17", "type": "expense"}, {"id": 1000069, "desc": "Sate", "amount": 45000, "cat": "Food", "date": "2026-05-17", "type": "expense"}, {"id": 1000070, "desc": "Food tanah abang", "amount": 55000, "cat": "Food", "date": "2026-05-17", "type": "expense"}, {"id": 1000071, "desc": "Egg 1kg", "amount": 28000, "cat": "Food", "date": "2026-05-17", "type": "expense"}, {"id": 1000072, "desc": "Jasuke", "amount": 10000, "cat": "Food", "date": "2026-05-17", "type": "expense"}, {"id": 1000073, "desc": "Jajan", "amount": 15000, "cat": "Food", "date": "2026-05-18", "type": "expense"}, {"id": 1000074, "desc": "Car petrol", "amount": 100000, "cat": "Transport Car", "date": "2026-05-19", "type": "expense"}, {"id": 1000075, "desc": "Satay", "amount": 25000, "cat": "Personal", "date": "2026-05-19", "type": "expense"}, {"id": 1000076, "desc": "Motor petrol", "amount": 35000, "cat": "Transport Motor", "date": "2026-05-19", "type": "expense"}, {"id": 1000077, "desc": "Jajan", "amount": 5000, "cat": "Personal", "date": "2026-05-20", "type": "expense"}, {"id": 1000078, "desc": "OVO", "amount": 50000, "cat": "Wife", "date": "2026-05-20", "type": "expense"}, {"id": 1000079, "desc": "Makan malam", "amount": 36000, "cat": "Food", "date": "2026-05-21", "type": "expense"}, {"id": 1000080, "desc": "Jajan", "amount": 13000, "cat": "Personal", "date": "2026-05-21", "type": "expense"}, {"id": 1000081, "desc": "Jajan", "amount": 13000, "cat": "Personal", "date": "2026-05-22", "type": "expense"}, {"id": 1000082, "desc": "Sate", "amount": 31000, "cat": "Food", "date": "2026-05-23", "type": "expense"}, {"id": 1000083, "desc": "Sop sopan, jajan", "amount": 20000, "cat": "Food", "date": "2026-05-24", "type": "expense"}, {"id": 1000084, "desc": "Salary - Ayah", "amount": 9400000, "cat": "Income", "date": "2026-05-25", "type": "income"}, {"id": 1000085, "desc": "Mines Last Month", "amount": 800000, "cat": "Others", "date": "2026-05-25", "type": "expense"}, {"id": 1000086, "desc": "Bicycle for baby and case wife", "amount": 260000, "cat": "Shopping", "date": "2026-05-25", "type": "expense"}, {"id": 1000087, "desc": "IPL", "amount": 100000, "cat": "Utilities", "date": "2026-05-26", "type": "expense"}, {"id": 1000088, "desc": "Home internet wifi", "amount": 150000, "cat": "Internet", "date": "2026-05-26", "type": "expense"}, {"id": 1000089, "desc": "Martabak for house", "amount": 30000, "cat": "Food", "date": "2026-05-25", "type": "expense"}, {"id": 1000090, "desc": "Jajan", "amount": 33000, "cat": "Food", "date": "2026-05-27", "type": "expense"}, {"id": 1000091, "desc": "Ayam bakar", "amount": 30000, "cat": "Food", "date": "2026-05-26", "type": "expense"}, {"id": 1000092, "desc": "Car petrol", "amount": 100000, "cat": "Transport Car", "date": "2026-05-27", "type": "expense"}, {"id": 1000093, "desc": "Motor petrol", "amount": 35000, "cat": "Transport Motor", "date": "2026-05-26", "type": "expense"}, {"id": 1000094, "desc": "Sate", "amount": 60000, "cat": "Food", "date": "2026-05-27", "type": "expense"}, {"id": 1000095, "desc": "Wife", "amount": 100000, "cat": "Wife", "date": "2026-05-27", "type": "expense"}, {"id": 1000096, "desc": "Wife", "amount": 500000, "cat": "Wife", "date": "2026-05-27", "type": "expense"}, {"id": 1000097, "desc": "Month shopping", "amount": 400000, "cat": "Shopping", "date": "2026-05-27", "type": "expense"}, {"id": 1000098, "desc": "Jajan", "amount": 15000, "cat": "Personal", "date": "2026-05-28", "type": "expense"}, {"id": 1000099, "desc": "Online", "amount": 135000, "cat": "Shopping", "date": "2026-05-29", "type": "expense"}, {"id": 1000100, "desc": "Beli jersey", "amount": 170000, "cat": "Cashout", "date": "2026-05-29", "type": "expense"}, {"id": 1000101, "desc": "Jajan", "amount": 15000, "cat": "Personal", "date": "2026-05-29", "type": "expense"}, {"id": 1000102, "desc": "Jajan", "amount": 15000, "cat": "Personal", "date": "2026-05-30", "type": "expense"}, {"id": 1000103, "desc": "Flazz BCA toll", "amount": 50000, "cat": "E-money", "date": "2026-05-30", "type": "expense"}, {"id": 1000104, "desc": "Kondangan", "amount": 200000, "cat": "Gifts", "date": "2026-05-30", "type": "expense"}, {"id": 1000105, "desc": "Admin", "amount": 10000, "cat": "Personal", "date": "2026-05-30", "type": "expense"}, {"id": 1000106, "desc": "Sate maranggi babeh", "amount": 112000, "cat": "Food", "date": "2026-05-30", "type": "expense"}, {"id": 1000107, "desc": "Cendol + Lazatto", "amount": 46000, "cat": "Food", "date": "2026-05-31", "type": "expense"}, {"id": 1000108, "desc": "Baju SGC", "amount": 93000, "cat": "Shopping", "date": "2026-05-31", "type": "expense"}, {"id": 1000109, "desc": "Car petrol puncak", "amount": 200000, "cat": "Transport Car", "date": "2026-06-01", "type": "expense"}, {"id": 1000110, "desc": "Fried rice and indomie and water", "amount": 44000, "cat": "Food", "date": "2026-06-01", "type": "expense"}, {"id": 1000111, "desc": "Animal food erif", "amount": 25000, "cat": "Food", "date": "2026-06-01", "type": "expense"}, {"id": 1000112, "desc": "Jajan", "amount": 20000, "cat": "Personal", "date": "2026-06-02", "type": "expense"}, {"id": 1000113, "desc": "Crispy Mushroom", "amount": 10000, "cat": "Food", "date": "2026-06-02", "type": "expense"}, {"id": 1000114, "desc": "Roller egg", "amount": 5000, "cat": "Food", "date": "2026-06-02", "type": "expense"}, {"id": 1000115, "desc": "Watermelon", "amount": 15000, "cat": "Food", "date": "2026-06-02", "type": "expense"}, {"id": 1000116, "desc": "Orang tua", "amount": 650000, "cat": "Gifts", "date": "2026-06-02", "type": "expense"}, {"id": 1000117, "desc": "Home debt", "amount": 4400000, "cat": "Home debt", "date": "2026-06-02", "type": "expense"}, {"id": 1000118, "desc": "Lele + nasi", "amount": 16000, "cat": "Food", "date": "2026-06-02", "type": "expense"}, {"id": 1000119, "desc": "Makan ayam", "amount": 22000, "cat": "Personal", "date": "2026-06-03", "type": "expense"}, {"id": 1000120, "desc": "Makan Lele", "amount": 20000, "cat": "Food", "date": "2026-06-03", "type": "expense"}, {"id": 1000121, "desc": "Fitting lampu", "amount": 7000, "cat": "Repair House", "date": "2026-06-03", "type": "expense"}, {"id": 1000122, "desc": "Jajan", "amount": 20000, "cat": "Personal", "date": "2026-06-04", "type": "expense"}, {"id": 1000123, "desc": "Jajan", "amount": 10000, "cat": "Personal", "date": "2026-06-04", "type": "expense"}, {"id": 1000124, "desc": "Pulsa bapak", "amount": 30000, "cat": "Internet", "date": "2026-06-06", "type": "expense"}, {"id": 1000125, "desc": "Train", "amount": 20000, "cat": "E-money", "date": "2026-06-06", "type": "expense"}, {"id": 1000126, "desc": "Belanja online", "amount": 192000, "cat": "Shopping", "date": "2026-06-06", "type": "expense"}, {"id": 1000127, "desc": "Food", "amount": 42000, "cat": "Food", "date": "2026-06-07", "type": "expense"}, {"id": 1000128, "desc": "Lele", "amount": 22000, "cat": "Food", "date": "2026-06-07", "type": "expense"}, {"id": 1000129, "desc": "Shopping House", "amount": 463000, "cat": "Repair House", "date": "2026-06-07", "type": "expense"}, {"id": 1000130, "desc": "Pulsa saya", "amount": 50000, "cat": "Internet", "date": "2026-06-08", "type": "expense"}, {"id": 1000131, "desc": "Milk", "amount": 334500, "cat": "Child milk", "date": "2026-06-08", "type": "expense"}, {"id": 1000132, "desc": "Transport Car", "amount": 100000, "cat": "Transport Car", "date": "2026-06-08", "type": "expense"}, {"id": 1000133, "desc": "Cicilan hutang - Ibun", "amount": 1900000, "cat": "Home debt", "date": "2026-04-24", "type": "expense"}, {"id": 1000134, "desc": "Sedekah", "amount": 250000, "cat": "Gifts", "date": "2026-04-25", "type": "expense"}, {"id": 1000135, "desc": "Orangtua", "amount": 1000000, "cat": "Parents", "date": "2026-04-27", "type": "expense"}, {"id": 1000136, "desc": "Sarapan", "amount": 14000, "cat": "Breakfast", "date": "2026-04-27", "type": "expense"}, {"id": 1000137, "desc": "Shopee baju & matras", "amount": 22168, "cat": "Personal shopping", "date": "2026-04-25", "type": "expense"}, {"id": 1000138, "desc": "Shopee TNW & kotak tissue kayu", "amount": 147763, "cat": "Others", "date": "2026-04-26", "type": "expense"}, {"id": 1000139, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-04-27", "type": "expense"}, {"id": 1000140, "desc": "Jeruk", "amount": 100000, "cat": "Parents", "date": "2026-04-27", "type": "expense"}, {"id": 1000141, "desc": "Tambahan belanja halbil GTR", "amount": 168660, "cat": "Others", "date": "2026-04-25", "type": "expense"}, {"id": 1000142, "desc": "Emas anting kinara & parkir", "amount": 2101000, "cat": "Others", "date": "2026-04-27", "type": "expense"}, {"id": 1000143, "desc": "Makan malam", "amount": 50000, "cat": "Others", "date": "2026-04-27", "type": "expense"}, {"id": 1000144, "desc": "Tol", "amount": 26500, "cat": "Transport", "date": "2026-04-28", "type": "expense"}, {"id": 1000145, "desc": "Bensin", "amount": 100000, "cat": "Transport", "date": "2026-04-28", "type": "expense"}, {"id": 1000146, "desc": "Hutang emas sisa 8.08 gr 16k", "amount": 15050616, "cat": "Hutang", "date": "2026-04-30", "type": "expense"}, {"id": 1000147, "desc": "Topi & tas matras", "amount": 22784, "cat": "Personal shopping", "date": "2026-04-29", "type": "expense"}, {"id": 1000148, "desc": "Tol", "amount": 26500, "cat": "Transport", "date": "2026-04-29", "type": "expense"}, {"id": 1000149, "desc": "Tol", "amount": 9500, "cat": "Transport", "date": "2026-04-28", "type": "expense"}, {"id": 1000150, "desc": "Sarapan", "amount": 10000, "cat": "Breakfast", "date": "2026-04-29", "type": "expense"}, {"id": 1000151, "desc": "SPP Kinara", "amount": 925000, "cat": "Others", "date": "2026-04-11", "type": "expense"}, {"id": 1000152, "desc": "Trial class renang", "amount": 185000, "cat": "Others", "date": "2026-04-18", "type": "expense"}, {"id": 1000153, "desc": "Kondangan mas farid", "amount": 200000, "cat": "Others", "date": "2026-04-20", "type": "expense"}, {"id": 1000154, "desc": "Belanja halbil GTR", "amount": 322880, "cat": "Others", "date": "2026-04-17", "type": "expense"}, {"id": 1000155, "desc": "Tol", "amount": 26500, "cat": "Transport", "date": "2026-04-29", "type": "expense"}, {"id": 1000156, "desc": "Sarapan", "amount": 14000, "cat": "Breakfast", "date": "2026-04-30", "type": "expense"}, {"id": 1000157, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-04-30", "type": "expense"}, {"id": 1000158, "desc": "Susu 2 kaleng", "amount": 526907, "cat": "Others", "date": "2026-04-30", "type": "expense"}, {"id": 1000159, "desc": "Snack & air dus tmrw", "amount": 60000, "cat": "Holiday", "date": "2026-05-01", "type": "expense"}, {"id": 1000160, "desc": "Sosis tmwr", "amount": 89000, "cat": "Holiday", "date": "2026-05-01", "type": "expense"}, {"id": 1000161, "desc": "Popmie & bumbu tmrw", "amount": 77000, "cat": "Holiday", "date": "2026-05-01", "type": "expense"}, {"id": 1000162, "desc": "Gas & mainan bubble tmrw", "amount": 26000, "cat": "Holiday", "date": "2026-05-01", "type": "expense"}, {"id": 1000163, "desc": "Tol tmrw", "amount": 200000, "cat": "Holiday", "date": "2026-05-02", "type": "expense"}, {"id": 1000164, "desc": "Ayam anyer tmrw", "amount": 48000, "cat": "Holiday", "date": "2026-05-02", "type": "expense"}, {"id": 1000165, "desc": "Minum baik anyer mandiri", "amount": 39900, "cat": "Holiday", "date": "2026-05-02", "type": "expense"}, {"id": 1000166, "desc": "Sikat, sodet, tali, krayon", "amount": 45000, "cat": "Others", "date": "2026-05-03", "type": "expense"}, {"id": 1000167, "desc": "Celana & case hp", "amount": 56754, "cat": "Personal shopping", "date": "2026-05-04", "type": "expense"}, {"id": 1000168, "desc": "Masuk pantai & gazebo", "amount": 200000, "cat": "Holiday", "date": "2026-05-03", "type": "expense"}, {"id": 1000169, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-04", "type": "expense"}, {"id": 1000170, "desc": "Sarapan", "amount": 13000, "cat": "Breakfast", "date": "2026-05-04", "type": "expense"}, {"id": 1000171, "desc": "Tempe dan bawang terigu", "amount": 11000, "cat": "Others", "date": "2026-05-04", "type": "expense"}, {"id": 1000172, "desc": "Transport pp", "amount": 26500, "cat": "Transport", "date": "2026-05-05", "type": "expense"}, {"id": 1000173, "desc": "Sarapan", "amount": 17000, "cat": "Breakfast", "date": "2026-05-05", "type": "expense"}, {"id": 1000174, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-06", "type": "expense"}, {"id": 1000175, "desc": "Sarapan", "amount": 25000, "cat": "Breakfast", "date": "2026-05-06", "type": "expense"}, {"id": 1000176, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-07", "type": "expense"}, {"id": 1000177, "desc": "Sarapan", "amount": 12000, "cat": "Breakfast", "date": "2026-05-07", "type": "expense"}, {"id": 1000178, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-08", "type": "expense"}, {"id": 1000179, "desc": "Sarapan", "amount": 12000, "cat": "Breakfast", "date": "2026-05-08", "type": "expense"}, {"id": 1000180, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-11", "type": "expense"}, {"id": 1000181, "desc": "Sarapan", "amount": 5000, "cat": "Breakfast", "date": "2026-05-11", "type": "expense"}, {"id": 1000182, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-12", "type": "expense"}, {"id": 1000183, "desc": "Sarapan dan pembalut satuan", "amount": 15000, "cat": "Breakfast", "date": "2026-05-12", "type": "expense"}, {"id": 1000184, "desc": "Arisan", "amount": 60000, "cat": "Arisan", "date": "2026-05-11", "type": "expense"}, {"id": 1000185, "desc": "Kue arisan mertua", "amount": 175000, "cat": "Others", "date": "2026-05-10", "type": "expense"}, {"id": 1000186, "desc": "Tol", "amount": 68000, "cat": "Others", "date": "2026-05-10", "type": "expense"}, {"id": 1000187, "desc": "Bakso", "amount": 32000, "cat": "Others", "date": "2026-05-07", "type": "expense"}, {"id": 1000188, "desc": "Kacamata", "amount": 15977, "cat": "Personal shopping", "date": "2026-05-10", "type": "expense"}, {"id": 1000189, "desc": "Zumba Mei", "amount": 96000, "cat": "Zumba", "date": "2026-05-12", "type": "expense"}, {"id": 1000190, "desc": "Qurban26", "amount": 3700000, "cat": "Qurban", "date": "2026-05-12", "type": "expense"}, {"id": 1000191, "desc": "Baju SGC", "amount": 240000, "cat": "Personal shopping", "date": "2026-05-12", "type": "expense"}, {"id": 1000192, "desc": "Soto dan es teh", "amount": 18000, "cat": "Others", "date": "2026-05-12", "type": "expense"}, {"id": 1000193, "desc": "Sarapan", "amount": 10000, "cat": "Breakfast", "date": "2026-05-13", "type": "expense"}, {"id": 1000194, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-13", "type": "expense"}, {"id": 1000195, "desc": "Pembalut alfa dan warung", "amount": 15900, "cat": "Breakfast", "date": "2026-05-13", "type": "expense"}, {"id": 1000196, "desc": "Sarapan", "amount": 10000, "cat": "Breakfast", "date": "2026-05-15", "type": "expense"}, {"id": 1000197, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-15", "type": "expense"}, {"id": 1000198, "desc": "Sarapan", "amount": 5000, "cat": "Breakfast", "date": "2026-05-18", "type": "expense"}, {"id": 1000199, "desc": "Jajan malam", "amount": 34000, "cat": "Breakfast", "date": "2026-05-18", "type": "expense"}, {"id": 1000200, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-18", "type": "expense"}, {"id": 1000201, "desc": "Sarapan", "amount": 10000, "cat": "Breakfast", "date": "2026-05-19", "type": "expense"}, {"id": 1000202, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-19", "type": "expense"}, {"id": 1000203, "desc": "Khiban", "amount": 150000, "cat": "Personal shopping", "date": "2026-05-17", "type": "expense"}, {"id": 1000204, "desc": "Celana anak", "amount": 30000, "cat": "Personal shopping", "date": "2026-05-17", "type": "expense"}, {"id": 1000205, "desc": "Set baju", "amount": 150000, "cat": "Personal shopping", "date": "2026-05-17", "type": "expense"}, {"id": 1000206, "desc": "Shopee rompi", "amount": 45250, "cat": "Personal shopping", "date": "2026-05-15", "type": "expense"}, {"id": 1000207, "desc": "Shopee rompi", "amount": 85665, "cat": "Personal shopping", "date": "2026-05-15", "type": "expense"}, {"id": 1000208, "desc": "Shopee broco", "amount": 59549, "cat": "Personal shopping", "date": "2026-05-19", "type": "expense"}, {"id": 1000209, "desc": "Shopee tanah kompos 3 karung", "amount": 42062, "cat": "Personal shopping", "date": "2026-05-19", "type": "expense"}, {"id": 1000210, "desc": "Sarapan", "amount": 15000, "cat": "Breakfast", "date": "2026-05-20", "type": "expense"}, {"id": 1000211, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-20", "type": "expense"}, {"id": 1000212, "desc": "Sarapan", "amount": 7000, "cat": "Breakfast", "date": "2026-05-21", "type": "expense"}, {"id": 1000213, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-21", "type": "expense"}, {"id": 1000214, "desc": "Sarapan", "amount": 5000, "cat": "Breakfast", "date": "2026-05-22", "type": "expense"}, {"id": 1000215, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-22", "type": "expense"}, {"id": 1000216, "desc": "Tempe", "amount": 5000, "cat": "Breakfast", "date": "2026-05-22", "type": "expense"}, {"id": 1000217, "desc": "Sarapan", "amount": 8000, "cat": "Breakfast", "date": "2026-05-23", "type": "expense"}, {"id": 1000218, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-23", "type": "expense"}, {"id": 1000219, "desc": "Bakso", "amount": 75000, "cat": "Others", "date": "2026-05-24", "type": "expense"}, {"id": 1000220, "desc": "Salary - Ibun", "amount": 7885820, "cat": "Income", "date": "2026-04-24", "type": "income"}, {"id": 1000221, "desc": "Husband - Ibun", "amount": 500000, "cat": "Income", "date": "2026-04-25", "type": "income"}, {"id": 1000222, "desc": "Bonus - Ibun", "amount": 14856781, "cat": "Income", "date": "2026-04-10", "type": "income"}, {"id": 1000223, "desc": "Uang makan", "amount": 640000, "cat": "Income", "date": "2026-04-24", "type": "income"}, {"id": 1000224, "desc": "Overtime", "amount": 2715230, "cat": "Income", "date": "2026-04-24", "type": "income"}, {"id": 1000225, "desc": "Uang transport", "amount": 56000, "cat": "Income", "date": "2026-04-24", "type": "income"}, {"id": 1000226, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-05-25", "type": "expense"}, {"id": 1000227, "desc": "Es teh buka puasa", "amount": 5000, "cat": "Breakfast", "date": "2026-05-25", "type": "expense"}, {"id": 1000228, "desc": "Susu 1.8kg", "amount": 696350, "cat": "Others", "date": "2026-05-25", "type": "expense"}, {"id": 1000229, "desc": "Belanja bulanan", "amount": 241600, "cat": "Others", "date": "2026-05-25", "type": "expense"}, {"id": 1000230, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-05-26", "type": "expense"}, {"id": 1000231, "desc": "Patungan cupet nikah", "amount": 77500, "cat": "Others", "date": "2026-05-27", "type": "expense"}, {"id": 1000232, "desc": "Rumah - Ibun", "amount": 1900000, "cat": "Home debt", "date": "2026-05-28", "type": "expense"}, {"id": 1000233, "desc": "Sedekah", "amount": 250000, "cat": "Gifts", "date": "2026-05-28", "type": "expense"}, {"id": 1000234, "desc": "Orangtua", "amount": 1000000, "cat": "Parents", "date": "2026-05-28", "type": "expense"}, {"id": 1000235, "desc": "Kue bandung", "amount": 50000, "cat": "Others", "date": "2026-05-28", "type": "expense"}, {"id": 1000236, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-05-29", "type": "expense"}, {"id": 1000237, "desc": "Sarapan", "amount": 13000, "cat": "Breakfast", "date": "2026-05-29", "type": "expense"}, {"id": 1000238, "desc": "Tukang kebun", "amount": 300000, "cat": "Others", "date": "2026-05-30", "type": "expense"}, {"id": 1000239, "desc": "Baju", "amount": 150000, "cat": "Personal shopping", "date": "2026-05-30", "type": "expense"}, {"id": 1000240, "desc": "Liburan", "amount": 187000, "cat": "Holiday", "date": "2026-05-31", "type": "expense"}, {"id": 1000241, "desc": "Sepatu", "amount": 129900, "cat": "Personal shopping", "date": "2026-05-31", "type": "expense"}, {"id": 1000242, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-06-02", "type": "expense"}, {"id": 1000243, "desc": "Sarapan", "amount": 12000, "cat": "Breakfast", "date": "2026-06-02", "type": "expense"}, {"id": 1000244, "desc": "Posyandu Mei Juni", "amount": 200000, "cat": "Posyandu", "date": "2026-06-02", "type": "expense"}, {"id": 1000245, "desc": "Es teh", "amount": 5000, "cat": "Breakfast", "date": "2026-06-02", "type": "expense"}, {"id": 1000246, "desc": "Sarapan", "amount": 12000, "cat": "Breakfast", "date": "2026-06-03", "type": "expense"}, {"id": 1000247, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-06-03", "type": "expense"}, {"id": 1000248, "desc": "Sate padang", "amount": 44000, "cat": "Dinner", "date": "2026-06-03", "type": "expense"}, {"id": 1000249, "desc": "Transport pp - Ibun", "amount": 47200, "cat": "Transport", "date": "2026-06-04", "type": "expense"}, {"id": 1000250, "desc": "Sarapan", "amount": 8000, "cat": "Breakfast", "date": "2026-06-04", "type": "expense"}, {"id": 1000251, "desc": "Bakso mie ayam", "amount": 27000, "cat": "Dinner", "date": "2026-06-04", "type": "expense"}, {"id": 1000252, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-06-05", "type": "expense"}, {"id": 1000253, "desc": "Sarapan", "amount": 20000, "cat": "Breakfast", "date": "2026-06-05", "type": "expense"}, {"id": 1000254, "desc": "Kontrol gigi", "amount": 300000, "cat": "Others", "date": "2026-06-05", "type": "expense"}, {"id": 1000255, "desc": "Sate taichan", "amount": 25000, "cat": "Dinner", "date": "2026-06-05", "type": "expense"}, {"id": 1000256, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-06-06", "type": "expense"}, {"id": 1000257, "desc": "Sarapan + siang", "amount": 29000, "cat": "Breakfast", "date": "2026-06-06", "type": "expense"}, {"id": 1000258, "desc": "Lip, kabel pelindung, bros", "amount": 73715, "cat": "Personal shopping", "date": "2026-06-06", "type": "expense"}, {"id": 1000259, "desc": "Kopi tukang dan 3 susu", "amount": 39000, "cat": "Others", "date": "2026-06-07", "type": "expense"}, {"id": 1000260, "desc": "Keramik dapur dan toilet", "amount": 395000, "cat": "Others", "date": "2026-06-07", "type": "expense"}, {"id": 1000261, "desc": "Roaster", "amount": 42000, "cat": "Others", "date": "2026-06-07", "type": "expense"}, {"id": 1000262, "desc": "Remover dan glass box", "amount": 154020, "cat": "Others", "date": "2026-06-07", "type": "expense"}, {"id": 1000263, "desc": "Pempers", "amount": 132840, "cat": "Others", "date": "2026-06-07", "type": "expense"}, {"id": 1000264, "desc": "Soto", "amount": 44000, "cat": "Others", "date": "2026-06-07", "type": "expense"}, {"id": 1000265, "desc": "Bahan renov material", "amount": 1462500, "cat": "Others", "date": "2026-06-07", "type": "expense"}, {"id": 1000266, "desc": "Susu, MM choice, loluna, buku", "amount": 805829, "cat": "Others", "date": "2026-06-07", "type": "expense"}, {"id": 1000267, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-06-08", "type": "expense"}, {"id": 1000268, "desc": "Sarapan", "amount": 12000, "cat": "Breakfast", "date": "2026-06-08", "type": "expense"}, {"id": 1000269, "desc": "Jasa tukang 3 hari", "amount": 600000, "cat": "Others", "date": "2026-06-08", "type": "expense"}, {"id": 1000270, "desc": "Arisan", "amount": 60000, "cat": "Arisan", "date": "2026-06-08", "type": "expense"}, {"id": 1000271, "desc": "AC + pegangan bapak", "amount": 150000, "cat": "Others", "date": "2026-06-08", "type": "expense"}, {"id": 1000272, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-06-09", "type": "expense"}, {"id": 1000273, "desc": "Sarapan, teh dan mie ayam malam", "amount": 59000, "cat": "Breakfast", "date": "2026-06-09", "type": "expense"}, {"id": 1000274, "desc": "Roster, glassbox, cat dasar, kabel, kape", "amount": 309000, "cat": "Others", "date": "2026-06-09", "type": "expense"}, {"id": 1000275, "desc": "Salary - Ibun", "amount": 8019514, "cat": "Income", "date": "2026-05-25", "type": "income"}, {"id": 1000276, "desc": "Lebihan uang April", "amount": 896407, "cat": "Income", "date": "2026-05-25", "type": "income"}, {"id": 1000277, "desc": "Nafkah dan belanja", "amount": 900000, "cat": "Income", "date": "2026-05-28", "type": "income"}, {"id": 1000278, "desc": "Bonus - Ibun", "amount": 2900000, "cat": "Income", "date": "2026-05-29", "type": "income"}, {"id": 1000279, "desc": "Qurban26", "amount": 3700000, "cat": "Qurban", "date": "2026-05-12", "type": "expense"}];
-  const existingIds = new Set(transactions.map(t => t.id));
-  const toAdd = preloaded.filter(t => !existingIds.has(t.id));
-  if(toAdd.length > 0) {
-    transactions = [...transactions, ...toAdd];
-    save();
-  }
+  // Merge preloaded spreadsheet data
+  const preloaded = [{"id": 1000000, "member": "ayah", "desc": "Cicilan hutang", "amount": 190000, "cat": "Shopping", "date": "2026-04-24", "type": "expense"}, {"id": 1000001, "desc": "Milk and hat", "amount": 302000, "cat": "Child milk", "date": "2026-04-24", "type": "expense", "member": "ayah"}, {"id": 1000002, "desc": "Ibun", "amount": 500000, "cat": "Wife", "date": "2026-04-25", "type": "expense", "member": "ayah"}, {"id": 1000003, "desc": "Pelampung, Kacamata, Jemuran", "amount": 150000, "cat": "Shopping", "date": "2026-04-25", "type": "expense", "member": "ayah"}, {"id": 1000004, "desc": "Orang tua", "amount": 650000, "cat": "Gifts", "date": "2026-04-25", "type": "expense", "member": "ayah"}, {"id": 1000005, "desc": "IPL Khalas", "amount": 100000, "cat": "Utilities", "date": "2026-04-25", "type": "expense", "member": "ayah"}, {"id": 1000006, "desc": "Car petrol", "amount": 100000, "cat": "Transport Car", "date": "2026-04-25", "type": "expense", "member": "ayah"}, {"id": 1000007, "desc": "Soto", "amount": 15000, "cat": "Food", "date": "2026-04-25", "type": "expense", "member": "ayah"}, {"id": 1000008, "desc": "Lazatto Chicken", "amount": 16000, "cat": "Food", "date": "2026-04-25", "type": "expense", "member": "ayah"}, {"id": 1000009, "desc": "Mini Soccer", "amount": 15000, "cat": "Personal", "date": "2026-04-25", "type": "expense", "member": "ayah"}, {"id": 1000010, "desc": "Makan", "amount": 18000, "cat": "Personal", "date": "2026-04-26", "type": "expense", "member": "ayah"}, {"id": 1000011, "desc": "Es buah", "amount": 10000, "cat": "Food", "date": "2026-04-26", "type": "expense", "member": "ayah"}, {"id": 1000012, "desc": "Ayam bakar", "amount": 16000, "cat": "Food", "date": "2026-04-25", "type": "expense", "member": "ayah"}, {"id": 1000013, "desc": "Sate taichan", "amount": 40000, "cat": "Food", "date": "2026-04-25", "type": "expense", "member": "ayah"}, {"id": 1000014, "desc": "Basreng and es", "amount": 10000, "cat": "Food", "date": "2026-04-25", "type": "expense", "member": "ayah"}, {"id": 1000015, "desc": "Lele and Es", "amount": 18000, "cat": "Food", "date": "2026-04-26", "type": "expense", "member": "ayah"}, {"id": 1000016, "desc": "Parking", "amount": 2000, "cat": "Parking", "date": "2026-04-26", "type": "expense", "member": "ayah"}, {"id": 1000017, "desc": "PBB", "amount": 250000, "cat": "Home debt", "date": "2026-04-26", "type": "expense", "member": "ayah"}, {"id": 1000018, "desc": "Electricity", "amount": 200000, "cat": "Electricity", "date": "2026-04-26", "type": "expense", "member": "ayah"}, {"id": 1000019, "desc": "BTN", "amount": 4250000, "cat": "Home debt", "date": "2026-04-27", "type": "expense", "member": "ayah"}, {"id": 1000020, "desc": "Makan siang", "amount": 25000, "cat": "Personal", "date": "2026-04-27", "type": "expense", "member": "ayah"}, {"id": 1000021, "desc": "Jajan sore", "amount": 5000, "cat": "Personal", "date": "2026-04-27", "type": "expense", "member": "ayah"}, {"id": 1000022, "desc": "Jajan", "amount": 5000, "cat": "Personal", "date": "2026-04-28", "type": "expense", "member": "ayah"}, {"id": 1000023, "desc": "Makan malam", "amount": 20000, "cat": "Food", "date": "2026-04-28", "type": "expense", "member": "ayah"}, {"id": 1000024, "desc": "Nasi Goreng", "amount": 31000, "cat": "Food", "date": "2026-04-29", "type": "expense", "member": "ayah"}, {"id": 1000025, "desc": "Mendoan", "amount": 10000, "cat": "Personal", "date": "2026-04-30", "type": "expense", "member": "ayah"}, {"id": 1000026, "desc": "Admin", "amount": 3000, "cat": "Personal", "date": "2026-04-30", "type": "expense", "member": "ayah"}, {"id": 1000027, "desc": "Cashout", "amount": 300000, "cat": "Cashout", "date": "2026-04-30", "type": "expense", "member": "ayah"}, {"id": 1000028, "desc": "Cashout", "amount": 200000, "cat": "Cashout", "date": "2026-04-24", "type": "expense", "member": "ayah"}, {"id": 1000029, "desc": "Salary - Ayah", "amount": 9400000, "cat": "Income", "date": "2026-04-24", "type": "income", "member": "ayah"}, {"id": 1000030, "desc": "Mie ayam", "amount": 25000, "cat": "Food", "date": "2026-05-01", "type": "expense", "member": "ayah"}, {"id": 1000031, "desc": "Holiday Petrol Anyer", "amount": 200000, "cat": "Transport Car", "date": "2026-05-02", "type": "expense", "member": "ayah"}, {"id": 1000032, "desc": "Urunan", "amount": 150000, "cat": "Utilities", "date": "2026-05-03", "type": "expense", "member": "ayah"}, {"id": 1000033, "desc": "Frozen", "amount": 37000, "cat": "Food", "date": "2026-05-03", "type": "expense", "member": "ayah"}, {"id": 1000034, "desc": "Maranggi", "amount": 45000, "cat": "Food", "date": "2026-05-03", "type": "expense", "member": "ayah"}, {"id": 1000035, "desc": "Jajan", "amount": 16000, "cat": "Personal", "date": "2026-05-04", "type": "expense", "member": "ayah"}, {"id": 1000036, "desc": "Cotton bud and knife beard", "amount": 20000, "cat": "Personal", "date": "2026-05-04", "type": "expense", "member": "ayah"}, {"id": 1000037, "desc": "Car petrol", "amount": 100000, "cat": "Transport Car", "date": "2026-05-04", "type": "expense", "member": "ayah"}, {"id": 1000038, "desc": "Jajan malam", "amount": 50000, "cat": "Food", "date": "2026-05-05", "type": "expense", "member": "ayah"}, {"id": 1000039, "desc": "Jajan malam", "amount": 50000, "cat": "Food", "date": "2026-05-06", "type": "expense", "member": "ayah"}, {"id": 1000040, "desc": "Cuci motor", "amount": 20000, "cat": "Personal", "date": "2026-05-07", "type": "expense", "member": "ayah"}, {"id": 1000041, "desc": "Jajan", "amount": 5000, "cat": "Personal", "date": "2026-05-07", "type": "expense", "member": "ayah"}, {"id": 1000042, "desc": "Susu", "amount": 36000, "cat": "Child milk", "date": "2026-05-08", "type": "expense", "member": "ayah"}, {"id": 1000043, "desc": "Jajan", "amount": 20000, "cat": "Personal", "date": "2026-05-08", "type": "expense", "member": "ayah"}, {"id": 1000044, "desc": "Motor petrol", "amount": 35000, "cat": "Transport Motor", "date": "2026-05-08", "type": "expense", "member": "ayah"}, {"id": 1000045, "desc": "Internet", "amount": 50000, "cat": "Internet", "date": "2026-05-09", "type": "expense", "member": "ayah"}, {"id": 1000046, "desc": "Plat Nomor", "amount": 35000, "cat": "Personal", "date": "2026-05-09", "type": "expense", "member": "ayah"}, {"id": 1000047, "desc": "Meatball with big family", "amount": 90000, "cat": "Food", "date": "2026-05-09", "type": "expense", "member": "ayah"}, {"id": 1000048, "desc": "Water galon", "amount": 21000, "cat": "Food", "date": "2026-05-10", "type": "expense", "member": "ayah"}, {"id": 1000049, "desc": "Lazatto Chicken", "amount": 13000, "cat": "Food", "date": "2026-05-10", "type": "expense", "member": "ayah"}, {"id": 1000050, "desc": "Car petrol", "amount": 150000, "cat": "Transport Car", "date": "2026-05-10", "type": "expense", "member": "ayah"}, {"id": 1000051, "desc": "Hair Cut", "amount": 35000, "cat": "Personal", "date": "2026-05-10", "type": "expense", "member": "ayah"}, {"id": 1000052, "desc": "Watermelon", "amount": 25000, "cat": "Food", "date": "2026-05-10", "type": "expense", "member": "ayah"}, {"id": 1000053, "desc": "Chicken Kremes", "amount": 21000, "cat": "Food", "date": "2026-05-10", "type": "expense", "member": "ayah"}, {"id": 1000054, "desc": "Water", "amount": 73000, "cat": "Water", "date": "2026-05-11", "type": "expense", "member": "ayah"}, {"id": 1000055, "desc": "PBB Khalas", "amount": 151000, "cat": "Home debt", "date": "2026-05-11", "type": "expense", "member": "ayah"}, {"id": 1000056, "desc": "Sate", "amount": 20000, "cat": "Food", "date": "2026-05-11", "type": "expense", "member": "ayah"}, {"id": 1000057, "desc": "Jajan", "amount": 13000, "cat": "Personal", "date": "2026-05-11", "type": "expense", "member": "ayah"}, {"id": 1000058, "desc": "Jajan", "amount": 15000, "cat": "Personal", "date": "2026-05-12", "type": "expense", "member": "ayah"}, {"id": 1000059, "desc": "Lele plus nasi goreng", "amount": 28000, "cat": "Food", "date": "2026-05-13", "type": "expense", "member": "ayah"}, {"id": 1000060, "desc": "Martabak", "amount": 30000, "cat": "Food", "date": "2026-05-13", "type": "expense", "member": "ayah"}, {"id": 1000061, "desc": "Kue for friends", "amount": 60000, "cat": "Food", "date": "2026-05-14", "type": "expense", "member": "ayah"}, {"id": 1000062, "desc": "Dkriuk", "amount": 14000, "cat": "Food", "date": "2026-05-14", "type": "expense", "member": "ayah"}, {"id": 1000063, "desc": "Haus", "amount": 34000, "cat": "Food", "date": "2026-05-14", "type": "expense", "member": "ayah"}, {"id": 1000064, "desc": "Milk", "amount": 335000, "cat": "Child milk", "date": "2026-05-14", "type": "expense", "member": "ayah"}, {"id": 1000065, "desc": "Cakwe and Sate Padang", "amount": 25000, "cat": "Food", "date": "2026-05-14", "type": "expense", "member": "ayah"}, {"id": 1000066, "desc": "Admin", "amount": 10000, "cat": "Personal", "date": "2026-05-15", "type": "expense", "member": "ayah"}, {"id": 1000067, "desc": "Electricity", "amount": 200000, "cat": "Electricity", "date": "2026-05-16", "type": "expense", "member": "ayah"}, {"id": 1000068, "desc": "E-money", "amount": 20000, "cat": "E-money", "date": "2026-05-17", "type": "expense", "member": "ayah"}, {"id": 1000069, "desc": "Sate", "amount": 45000, "cat": "Food", "date": "2026-05-17", "type": "expense", "member": "ayah"}, {"id": 1000070, "desc": "Food tanah abang", "amount": 55000, "cat": "Food", "date": "2026-05-17", "type": "expense", "member": "ayah"}, {"id": 1000071, "desc": "Egg 1kg", "amount": 28000, "cat": "Food", "date": "2026-05-17", "type": "expense", "member": "ayah"}, {"id": 1000072, "desc": "Jasuke", "amount": 10000, "cat": "Food", "date": "2026-05-17", "type": "expense", "member": "ayah"}, {"id": 1000073, "desc": "Jajan", "amount": 15000, "cat": "Food", "date": "2026-05-18", "type": "expense", "member": "ayah"}, {"id": 1000074, "desc": "Car petrol", "amount": 100000, "cat": "Transport Car", "date": "2026-05-19", "type": "expense", "member": "ayah"}, {"id": 1000075, "desc": "Satay", "amount": 25000, "cat": "Personal", "date": "2026-05-19", "type": "expense", "member": "ayah"}, {"id": 1000076, "desc": "Motor petrol", "amount": 35000, "cat": "Transport Motor", "date": "2026-05-19", "type": "expense", "member": "ayah"}, {"id": 1000077, "desc": "Jajan", "amount": 5000, "cat": "Personal", "date": "2026-05-20", "type": "expense", "member": "ayah"}, {"id": 1000078, "desc": "OVO", "amount": 50000, "cat": "Wife", "date": "2026-05-20", "type": "expense", "member": "ayah"}, {"id": 1000079, "desc": "Makan malam", "amount": 36000, "cat": "Food", "date": "2026-05-21", "type": "expense", "member": "ayah"}, {"id": 1000080, "desc": "Jajan", "amount": 13000, "cat": "Personal", "date": "2026-05-21", "type": "expense", "member": "ayah"}, {"id": 1000081, "desc": "Jajan", "amount": 13000, "cat": "Personal", "date": "2026-05-22", "type": "expense", "member": "ayah"}, {"id": 1000082, "desc": "Sate", "amount": 31000, "cat": "Food", "date": "2026-05-23", "type": "expense", "member": "ayah"}, {"id": 1000083, "desc": "Sop sopan, jajan", "amount": 20000, "cat": "Food", "date": "2026-05-24", "type": "expense", "member": "ayah"}, {"id": 1000084, "desc": "Salary - Ayah", "amount": 9400000, "cat": "Income", "date": "2026-05-25", "type": "income", "member": "ayah"}, {"id": 1000085, "desc": "Mines Last Month", "amount": 800000, "cat": "Others", "date": "2026-05-25", "type": "expense", "member": "ayah"}, {"id": 1000086, "desc": "Bicycle for baby and case wife", "amount": 260000, "cat": "Shopping", "date": "2026-05-25", "type": "expense", "member": "ayah"}, {"id": 1000087, "desc": "IPL", "amount": 100000, "cat": "Utilities", "date": "2026-05-26", "type": "expense", "member": "ayah"}, {"id": 1000088, "desc": "Home internet wifi", "amount": 150000, "cat": "Internet", "date": "2026-05-26", "type": "expense", "member": "ayah"}, {"id": 1000089, "desc": "Martabak for house", "amount": 30000, "cat": "Food", "date": "2026-05-25", "type": "expense", "member": "ayah"}, {"id": 1000090, "desc": "Jajan", "amount": 33000, "cat": "Food", "date": "2026-05-27", "type": "expense", "member": "ayah"}, {"id": 1000091, "desc": "Ayam bakar", "amount": 30000, "cat": "Food", "date": "2026-05-26", "type": "expense", "member": "ayah"}, {"id": 1000092, "desc": "Car petrol", "amount": 100000, "cat": "Transport Car", "date": "2026-05-27", "type": "expense", "member": "ayah"}, {"id": 1000093, "desc": "Motor petrol", "amount": 35000, "cat": "Transport Motor", "date": "2026-05-26", "type": "expense", "member": "ayah"}, {"id": 1000094, "desc": "Sate", "amount": 60000, "cat": "Food", "date": "2026-05-27", "type": "expense", "member": "ayah"}, {"id": 1000095, "desc": "Wife", "amount": 100000, "cat": "Wife", "date": "2026-05-27", "type": "expense", "member": "ayah"}, {"id": 1000096, "desc": "Wife", "amount": 500000, "cat": "Wife", "date": "2026-05-27", "type": "expense", "member": "ayah"}, {"id": 1000097, "desc": "Month shopping", "amount": 400000, "cat": "Shopping", "date": "2026-05-27", "type": "expense", "member": "ayah"}, {"id": 1000098, "desc": "Jajan", "amount": 15000, "cat": "Personal", "date": "2026-05-28", "type": "expense", "member": "ayah"}, {"id": 1000099, "desc": "Online", "amount": 135000, "cat": "Shopping", "date": "2026-05-29", "type": "expense", "member": "ayah"}, {"id": 1000100, "desc": "Beli jersey", "amount": 170000, "cat": "Cashout", "date": "2026-05-29", "type": "expense", "member": "ayah"}, {"id": 1000101, "desc": "Jajan", "amount": 15000, "cat": "Personal", "date": "2026-05-29", "type": "expense", "member": "ayah"}, {"id": 1000102, "desc": "Jajan", "amount": 15000, "cat": "Personal", "date": "2026-05-30", "type": "expense", "member": "ayah"}, {"id": 1000103, "desc": "Flazz BCA toll", "amount": 50000, "cat": "E-money", "date": "2026-05-30", "type": "expense", "member": "ayah"}, {"id": 1000104, "desc": "Kondangan", "amount": 200000, "cat": "Gifts", "date": "2026-05-30", "type": "expense", "member": "ayah"}, {"id": 1000105, "desc": "Admin", "amount": 10000, "cat": "Personal", "date": "2026-05-30", "type": "expense", "member": "ayah"}, {"id": 1000106, "desc": "Sate maranggi babeh", "amount": 112000, "cat": "Food", "date": "2026-05-30", "type": "expense", "member": "ayah"}, {"id": 1000107, "desc": "Cendol + Lazatto", "amount": 46000, "cat": "Food", "date": "2026-05-31", "type": "expense", "member": "ayah"}, {"id": 1000108, "desc": "Baju SGC", "amount": 93000, "cat": "Shopping", "date": "2026-05-31", "type": "expense", "member": "ayah"}, {"id": 1000109, "desc": "Car petrol puncak", "amount": 200000, "cat": "Transport Car", "date": "2026-06-01", "type": "expense", "member": "ayah"}, {"id": 1000110, "desc": "Fried rice and indomie and water", "amount": 44000, "cat": "Food", "date": "2026-06-01", "type": "expense", "member": "ayah"}, {"id": 1000111, "desc": "Animal food erif", "amount": 25000, "cat": "Food", "date": "2026-06-01", "type": "expense", "member": "ayah"}, {"id": 1000112, "desc": "Jajan", "amount": 20000, "cat": "Personal", "date": "2026-06-02", "type": "expense", "member": "ayah"}, {"id": 1000113, "desc": "Crispy Mushroom", "amount": 10000, "cat": "Food", "date": "2026-06-02", "type": "expense", "member": "ayah"}, {"id": 1000114, "desc": "Roller egg", "amount": 5000, "cat": "Food", "date": "2026-06-02", "type": "expense", "member": "ayah"}, {"id": 1000115, "desc": "Watermelon", "amount": 15000, "cat": "Food", "date": "2026-06-02", "type": "expense", "member": "ayah"}, {"id": 1000116, "desc": "Orang tua", "amount": 650000, "cat": "Gifts", "date": "2026-06-02", "type": "expense", "member": "ayah"}, {"id": 1000117, "desc": "Home debt", "amount": 4400000, "cat": "Home debt", "date": "2026-06-02", "type": "expense", "member": "ayah"}, {"id": 1000118, "desc": "Lele + nasi", "amount": 16000, "cat": "Food", "date": "2026-06-02", "type": "expense", "member": "ayah"}, {"id": 1000119, "desc": "Makan ayam", "amount": 22000, "cat": "Personal", "date": "2026-06-03", "type": "expense", "member": "ayah"}, {"id": 1000120, "desc": "Makan Lele", "amount": 20000, "cat": "Food", "date": "2026-06-03", "type": "expense", "member": "ayah"}, {"id": 1000121, "desc": "Fitting lampu", "amount": 7000, "cat": "Repair House", "date": "2026-06-03", "type": "expense", "member": "ayah"}, {"id": 1000122, "desc": "Jajan", "amount": 20000, "cat": "Personal", "date": "2026-06-04", "type": "expense", "member": "ayah"}, {"id": 1000123, "desc": "Jajan", "amount": 10000, "cat": "Personal", "date": "2026-06-04", "type": "expense", "member": "ayah"}, {"id": 1000124, "desc": "Pulsa bapak", "amount": 30000, "cat": "Internet", "date": "2026-06-06", "type": "expense", "member": "ayah"}, {"id": 1000125, "desc": "Train", "amount": 20000, "cat": "E-money", "date": "2026-06-06", "type": "expense", "member": "ayah"}, {"id": 1000126, "desc": "Belanja online", "amount": 192000, "cat": "Shopping", "date": "2026-06-06", "type": "expense", "member": "ayah"}, {"id": 1000127, "desc": "Food", "amount": 42000, "cat": "Food", "date": "2026-06-07", "type": "expense", "member": "ayah"}, {"id": 1000128, "desc": "Lele", "amount": 22000, "cat": "Food", "date": "2026-06-07", "type": "expense", "member": "ayah"}, {"id": 1000129, "desc": "Shopping House", "amount": 463000, "cat": "Repair House", "date": "2026-06-07", "type": "expense", "member": "ayah"}, {"id": 1000130, "desc": "Pulsa saya", "amount": 50000, "cat": "Internet", "date": "2026-06-08", "type": "expense", "member": "ayah"}, {"id": 1000131, "desc": "Milk", "amount": 334500, "cat": "Child milk", "date": "2026-06-08", "type": "expense", "member": "ayah"}, {"id": 1000132, "desc": "Transport Car", "amount": 100000, "cat": "Transport Car", "date": "2026-06-08", "type": "expense", "member": "ibu"}, {"id": 1000133, "desc": "Cicilan hutang - Ibun", "amount": 1900000, "cat": "Home debt", "date": "2026-04-24", "type": "expense", "member": "ibu"}, {"id": 1000134, "desc": "Sedekah", "amount": 250000, "cat": "Gifts", "date": "2026-04-25", "type": "expense", "member": "ibu"}, {"id": 1000135, "desc": "Orangtua", "amount": 1000000, "cat": "Parents", "date": "2026-04-27", "type": "expense", "member": "ibu"}, {"id": 1000136, "desc": "Sarapan", "amount": 14000, "cat": "Breakfast", "date": "2026-04-27", "type": "expense", "member": "ibu"}, {"id": 1000137, "desc": "Shopee baju & matras", "amount": 22168, "cat": "Personal shopping", "date": "2026-04-25", "type": "expense", "member": "ibu"}, {"id": 1000138, "desc": "Shopee TNW & kotak tissue kayu", "amount": 147763, "cat": "Others", "date": "2026-04-26", "type": "expense", "member": "ibu"}, {"id": 1000139, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-04-27", "type": "expense", "member": "ibu"}, {"id": 1000140, "desc": "Jeruk", "amount": 100000, "cat": "Parents", "date": "2026-04-27", "type": "expense", "member": "ibu"}, {"id": 1000141, "desc": "Tambahan belanja halbil GTR", "amount": 168660, "cat": "Others", "date": "2026-04-25", "type": "expense", "member": "ibu"}, {"id": 1000142, "desc": "Emas anting kinara & parkir", "amount": 2101000, "cat": "Others", "date": "2026-04-27", "type": "expense", "member": "ibu"}, {"id": 1000143, "desc": "Makan malam", "amount": 50000, "cat": "Others", "date": "2026-04-27", "type": "expense", "member": "ibu"}, {"id": 1000144, "desc": "Tol", "amount": 26500, "cat": "Transport", "date": "2026-04-28", "type": "expense", "member": "ibu"}, {"id": 1000145, "desc": "Bensin", "amount": 100000, "cat": "Transport", "date": "2026-04-28", "type": "expense", "member": "ibu"}, {"id": 1000146, "desc": "Hutang emas sisa 8.08 gr 16k", "amount": 15050616, "cat": "Hutang", "date": "2026-04-30", "type": "expense", "member": "ibu"}, {"id": 1000147, "desc": "Topi & tas matras", "amount": 22784, "cat": "Personal shopping", "date": "2026-04-29", "type": "expense", "member": "ibu"}, {"id": 1000148, "desc": "Tol", "amount": 26500, "cat": "Transport", "date": "2026-04-29", "type": "expense", "member": "ibu"}, {"id": 1000149, "desc": "Tol", "amount": 9500, "cat": "Transport", "date": "2026-04-28", "type": "expense", "member": "ibu"}, {"id": 1000150, "desc": "Sarapan", "amount": 10000, "cat": "Breakfast", "date": "2026-04-29", "type": "expense", "member": "ibu"}, {"id": 1000151, "desc": "SPP Kinara", "amount": 925000, "cat": "Others", "date": "2026-04-11", "type": "expense", "member": "ibu"}, {"id": 1000152, "desc": "Trial class renang", "amount": 185000, "cat": "Others", "date": "2026-04-18", "type": "expense", "member": "ibu"}, {"id": 1000153, "desc": "Kondangan mas farid", "amount": 200000, "cat": "Others", "date": "2026-04-20", "type": "expense", "member": "ibu"}, {"id": 1000154, "desc": "Belanja halbil GTR", "amount": 322880, "cat": "Others", "date": "2026-04-17", "type": "expense", "member": "ibu"}, {"id": 1000155, "desc": "Tol", "amount": 26500, "cat": "Transport", "date": "2026-04-29", "type": "expense", "member": "ibu"}, {"id": 1000156, "desc": "Sarapan", "amount": 14000, "cat": "Breakfast", "date": "2026-04-30", "type": "expense", "member": "ibu"}, {"id": 1000157, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-04-30", "type": "expense", "member": "ibu"}, {"id": 1000158, "desc": "Susu 2 kaleng", "amount": 526907, "cat": "Others", "date": "2026-04-30", "type": "expense", "member": "ibu"}, {"id": 1000159, "desc": "Snack & air dus tmrw", "amount": 60000, "cat": "Holiday", "date": "2026-05-01", "type": "expense", "member": "ibu"}, {"id": 1000160, "desc": "Sosis tmwr", "amount": 89000, "cat": "Holiday", "date": "2026-05-01", "type": "expense", "member": "ibu"}, {"id": 1000161, "desc": "Popmie & bumbu tmrw", "amount": 77000, "cat": "Holiday", "date": "2026-05-01", "type": "expense", "member": "ibu"}, {"id": 1000162, "desc": "Gas & mainan bubble tmrw", "amount": 26000, "cat": "Holiday", "date": "2026-05-01", "type": "expense", "member": "ibu"}, {"id": 1000163, "desc": "Tol tmrw", "amount": 200000, "cat": "Holiday", "date": "2026-05-02", "type": "expense", "member": "ibu"}, {"id": 1000164, "desc": "Ayam anyer tmrw", "amount": 48000, "cat": "Holiday", "date": "2026-05-02", "type": "expense", "member": "ibu"}, {"id": 1000165, "desc": "Minum baik anyer mandiri", "amount": 39900, "cat": "Holiday", "date": "2026-05-02", "type": "expense", "member": "ibu"}, {"id": 1000166, "desc": "Sikat, sodet, tali, krayon", "amount": 45000, "cat": "Others", "date": "2026-05-03", "type": "expense", "member": "ibu"}, {"id": 1000167, "desc": "Celana & case hp", "amount": 56754, "cat": "Personal shopping", "date": "2026-05-04", "type": "expense", "member": "ibu"}, {"id": 1000168, "desc": "Masuk pantai & gazebo", "amount": 200000, "cat": "Holiday", "date": "2026-05-03", "type": "expense", "member": "ibu"}, {"id": 1000169, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-04", "type": "expense", "member": "ibu"}, {"id": 1000170, "desc": "Sarapan", "amount": 13000, "cat": "Breakfast", "date": "2026-05-04", "type": "expense", "member": "ibu"}, {"id": 1000171, "desc": "Tempe dan bawang terigu", "amount": 11000, "cat": "Others", "date": "2026-05-04", "type": "expense", "member": "ibu"}, {"id": 1000172, "desc": "Transport pp", "amount": 26500, "cat": "Transport", "date": "2026-05-05", "type": "expense", "member": "ibu"}, {"id": 1000173, "desc": "Sarapan", "amount": 17000, "cat": "Breakfast", "date": "2026-05-05", "type": "expense", "member": "ibu"}, {"id": 1000174, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-06", "type": "expense", "member": "ibu"}, {"id": 1000175, "desc": "Sarapan", "amount": 25000, "cat": "Breakfast", "date": "2026-05-06", "type": "expense", "member": "ibu"}, {"id": 1000176, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-07", "type": "expense", "member": "ibu"}, {"id": 1000177, "desc": "Sarapan", "amount": 12000, "cat": "Breakfast", "date": "2026-05-07", "type": "expense", "member": "ibu"}, {"id": 1000178, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-08", "type": "expense", "member": "ibu"}, {"id": 1000179, "desc": "Sarapan", "amount": 12000, "cat": "Breakfast", "date": "2026-05-08", "type": "expense", "member": "ibu"}, {"id": 1000180, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-11", "type": "expense", "member": "ibu"}, {"id": 1000181, "desc": "Sarapan", "amount": 5000, "cat": "Breakfast", "date": "2026-05-11", "type": "expense", "member": "ibu"}, {"id": 1000182, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-12", "type": "expense", "member": "ibu"}, {"id": 1000183, "desc": "Sarapan dan pembalut satuan", "amount": 15000, "cat": "Breakfast", "date": "2026-05-12", "type": "expense", "member": "ibu"}, {"id": 1000184, "desc": "Arisan", "amount": 60000, "cat": "Arisan", "date": "2026-05-11", "type": "expense", "member": "ibu"}, {"id": 1000185, "desc": "Kue arisan mertua", "amount": 175000, "cat": "Others", "date": "2026-05-10", "type": "expense", "member": "ibu"}, {"id": 1000186, "desc": "Tol", "amount": 68000, "cat": "Others", "date": "2026-05-10", "type": "expense", "member": "ibu"}, {"id": 1000187, "desc": "Bakso", "amount": 32000, "cat": "Others", "date": "2026-05-07", "type": "expense", "member": "ibu"}, {"id": 1000188, "desc": "Kacamata", "amount": 15977, "cat": "Personal shopping", "date": "2026-05-10", "type": "expense", "member": "ibu"}, {"id": 1000189, "desc": "Zumba Mei", "amount": 96000, "cat": "Zumba", "date": "2026-05-12", "type": "expense", "member": "ibu"}, {"id": 1000190, "desc": "Qurban26", "amount": 3700000, "cat": "Qurban", "date": "2026-05-12", "type": "expense", "member": "ibu"}, {"id": 1000191, "desc": "Baju SGC", "amount": 240000, "cat": "Personal shopping", "date": "2026-05-12", "type": "expense", "member": "ibu"}, {"id": 1000192, "desc": "Soto dan es teh", "amount": 18000, "cat": "Others", "date": "2026-05-12", "type": "expense", "member": "ibu"}, {"id": 1000193, "desc": "Sarapan", "amount": 10000, "cat": "Breakfast", "date": "2026-05-13", "type": "expense", "member": "ibu"}, {"id": 1000194, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-13", "type": "expense", "member": "ibu"}, {"id": 1000195, "desc": "Pembalut alfa dan warung", "amount": 15900, "cat": "Breakfast", "date": "2026-05-13", "type": "expense", "member": "ibu"}, {"id": 1000196, "desc": "Sarapan", "amount": 10000, "cat": "Breakfast", "date": "2026-05-15", "type": "expense", "member": "ibu"}, {"id": 1000197, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-15", "type": "expense", "member": "ibu"}, {"id": 1000198, "desc": "Sarapan", "amount": 5000, "cat": "Breakfast", "date": "2026-05-18", "type": "expense", "member": "ibu"}, {"id": 1000199, "desc": "Jajan malam", "amount": 34000, "cat": "Breakfast", "date": "2026-05-18", "type": "expense", "member": "ibu"}, {"id": 1000200, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-18", "type": "expense", "member": "ibu"}, {"id": 1000201, "desc": "Sarapan", "amount": 10000, "cat": "Breakfast", "date": "2026-05-19", "type": "expense", "member": "ibu"}, {"id": 1000202, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-19", "type": "expense", "member": "ibu"}, {"id": 1000203, "desc": "Khiban", "amount": 150000, "cat": "Personal shopping", "date": "2026-05-17", "type": "expense", "member": "ibu"}, {"id": 1000204, "desc": "Celana anak", "amount": 30000, "cat": "Personal shopping", "date": "2026-05-17", "type": "expense", "member": "ibu"}, {"id": 1000205, "desc": "Set baju", "amount": 150000, "cat": "Personal shopping", "date": "2026-05-17", "type": "expense", "member": "ibu"}, {"id": 1000206, "desc": "Shopee rompi", "amount": 45250, "cat": "Personal shopping", "date": "2026-05-15", "type": "expense", "member": "ibu"}, {"id": 1000207, "desc": "Shopee rompi", "amount": 85665, "cat": "Personal shopping", "date": "2026-05-15", "type": "expense", "member": "ibu"}, {"id": 1000208, "desc": "Shopee broco", "amount": 59549, "cat": "Personal shopping", "date": "2026-05-19", "type": "expense", "member": "ibu"}, {"id": 1000209, "desc": "Shopee tanah kompos 3 karung", "amount": 42062, "cat": "Personal shopping", "date": "2026-05-19", "type": "expense", "member": "ibu"}, {"id": 1000210, "desc": "Sarapan", "amount": 15000, "cat": "Breakfast", "date": "2026-05-20", "type": "expense", "member": "ibu"}, {"id": 1000211, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-20", "type": "expense", "member": "ibu"}, {"id": 1000212, "desc": "Sarapan", "amount": 7000, "cat": "Breakfast", "date": "2026-05-21", "type": "expense", "member": "ibu"}, {"id": 1000213, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-21", "type": "expense", "member": "ibu"}, {"id": 1000214, "desc": "Sarapan", "amount": 5000, "cat": "Breakfast", "date": "2026-05-22", "type": "expense", "member": "ibu"}, {"id": 1000215, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-22", "type": "expense", "member": "ibu"}, {"id": 1000216, "desc": "Tempe", "amount": 5000, "cat": "Breakfast", "date": "2026-05-22", "type": "expense", "member": "ibu"}, {"id": 1000217, "desc": "Sarapan", "amount": 8000, "cat": "Breakfast", "date": "2026-05-23", "type": "expense", "member": "ibu"}, {"id": 1000218, "desc": "Transport pp", "amount": 40000, "cat": "Transport", "date": "2026-05-23", "type": "expense", "member": "ibu"}, {"id": 1000219, "desc": "Bakso", "amount": 75000, "cat": "Others", "date": "2026-05-24", "type": "expense", "member": "ibu"}, {"id": 1000220, "desc": "Salary - Ibun", "amount": 7885820, "cat": "Income", "date": "2026-04-24", "type": "income", "member": "ibu"}, {"id": 1000221, "desc": "Husband - Ibun", "amount": 500000, "cat": "Income", "date": "2026-04-25", "type": "income", "member": "ibu"}, {"id": 1000222, "desc": "Bonus - Ibun", "amount": 14856781, "cat": "Income", "date": "2026-04-10", "type": "income", "member": "ibu"}, {"id": 1000223, "desc": "Uang makan", "amount": 640000, "cat": "Income", "date": "2026-04-24", "type": "income", "member": "ibu"}, {"id": 1000224, "desc": "Overtime", "amount": 2715230, "cat": "Income", "date": "2026-04-24", "type": "income", "member": "ibu"}, {"id": 1000225, "desc": "Uang transport", "amount": 56000, "cat": "Income", "date": "2026-04-24", "type": "income", "member": "ibu"}, {"id": 1000226, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-05-25", "type": "expense", "member": "ibu"}, {"id": 1000227, "desc": "Es teh buka puasa", "amount": 5000, "cat": "Breakfast", "date": "2026-05-25", "type": "expense", "member": "ibu"}, {"id": 1000228, "desc": "Susu 1.8kg", "amount": 696350, "cat": "Others", "date": "2026-05-25", "type": "expense", "member": "ibu"}, {"id": 1000229, "desc": "Belanja bulanan", "amount": 241600, "cat": "Others", "date": "2026-05-25", "type": "expense", "member": "ibu"}, {"id": 1000230, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-05-26", "type": "expense", "member": "ibu"}, {"id": 1000231, "desc": "Patungan cupet nikah", "amount": 77500, "cat": "Others", "date": "2026-05-27", "type": "expense", "member": "ibu"}, {"id": 1000232, "desc": "Rumah - Ibun", "amount": 1900000, "cat": "Home debt", "date": "2026-05-28", "type": "expense", "member": "ibu"}, {"id": 1000233, "desc": "Sedekah", "amount": 250000, "cat": "Gifts", "date": "2026-05-28", "type": "expense", "member": "ibu"}, {"id": 1000234, "desc": "Orangtua", "amount": 1000000, "cat": "Parents", "date": "2026-05-28", "type": "expense", "member": "ibu"}, {"id": 1000235, "desc": "Kue bandung", "amount": 50000, "cat": "Others", "date": "2026-05-28", "type": "expense", "member": "ibu"}, {"id": 1000236, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-05-29", "type": "expense", "member": "ibu"}, {"id": 1000237, "desc": "Sarapan", "amount": 13000, "cat": "Breakfast", "date": "2026-05-29", "type": "expense", "member": "ibu"}, {"id": 1000238, "desc": "Tukang kebun", "amount": 300000, "cat": "Others", "date": "2026-05-30", "type": "expense", "member": "ibu"}, {"id": 1000239, "desc": "Baju", "amount": 150000, "cat": "Personal shopping", "date": "2026-05-30", "type": "expense", "member": "ibu"}, {"id": 1000240, "desc": "Liburan", "amount": 187000, "cat": "Holiday", "date": "2026-05-31", "type": "expense", "member": "ibu"}, {"id": 1000241, "desc": "Sepatu", "amount": 129900, "cat": "Personal shopping", "date": "2026-05-31", "type": "expense", "member": "ibu"}, {"id": 1000242, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-06-02", "type": "expense", "member": "ibu"}, {"id": 1000243, "desc": "Sarapan", "amount": 12000, "cat": "Breakfast", "date": "2026-06-02", "type": "expense", "member": "ibu"}, {"id": 1000244, "desc": "Posyandu Mei Juni", "amount": 200000, "cat": "Posyandu", "date": "2026-06-02", "type": "expense", "member": "ibu"}, {"id": 1000245, "desc": "Es teh", "amount": 5000, "cat": "Breakfast", "date": "2026-06-02", "type": "expense", "member": "ibu"}, {"id": 1000246, "desc": "Sarapan", "amount": 12000, "cat": "Breakfast", "date": "2026-06-03", "type": "expense", "member": "ibu"}, {"id": 1000247, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-06-03", "type": "expense", "member": "ibu"}, {"id": 1000248, "desc": "Sate padang", "amount": 44000, "cat": "Dinner", "date": "2026-06-03", "type": "expense", "member": "ibu"}, {"id": 1000249, "desc": "Transport pp - Ibun", "amount": 47200, "cat": "Transport", "date": "2026-06-04", "type": "expense", "member": "ibu"}, {"id": 1000250, "desc": "Sarapan", "amount": 8000, "cat": "Breakfast", "date": "2026-06-04", "type": "expense", "member": "ibu"}, {"id": 1000251, "desc": "Bakso mie ayam", "amount": 27000, "cat": "Dinner", "date": "2026-06-04", "type": "expense", "member": "ibu"}, {"id": 1000252, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-06-05", "type": "expense", "member": "ibu"}, {"id": 1000253, "desc": "Sarapan", "amount": 20000, "cat": "Breakfast", "date": "2026-06-05", "type": "expense", "member": "ibu"}, {"id": 1000254, "desc": "Kontrol gigi", "amount": 300000, "cat": "Others", "date": "2026-06-05", "type": "expense", "member": "ibu"}, {"id": 1000255, "desc": "Sate taichan", "amount": 25000, "cat": "Dinner", "date": "2026-06-05", "type": "expense", "member": "ibu"}, {"id": 1000256, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-06-06", "type": "expense", "member": "ibu"}, {"id": 1000257, "desc": "Sarapan + siang", "amount": 29000, "cat": "Breakfast", "date": "2026-06-06", "type": "expense", "member": "ibu"}, {"id": 1000258, "desc": "Lip, kabel pelindung, bros", "amount": 73715, "cat": "Personal shopping", "date": "2026-06-06", "type": "expense", "member": "ibu"}, {"id": 1000259, "desc": "Kopi tukang dan 3 susu", "amount": 39000, "cat": "Others", "date": "2026-06-07", "type": "expense", "member": "ibu"}, {"id": 1000260, "desc": "Keramik dapur dan toilet", "amount": 395000, "cat": "Others", "date": "2026-06-07", "type": "expense", "member": "ibu"}, {"id": 1000261, "desc": "Roaster", "amount": 42000, "cat": "Others", "date": "2026-06-07", "type": "expense", "member": "ibu"}, {"id": 1000262, "desc": "Remover dan glass box", "amount": 154020, "cat": "Others", "date": "2026-06-07", "type": "expense", "member": "ibu"}, {"id": 1000263, "desc": "Pempers", "amount": 132840, "cat": "Others", "date": "2026-06-07", "type": "expense", "member": "ibu"}, {"id": 1000264, "desc": "Soto", "amount": 44000, "cat": "Others", "date": "2026-06-07", "type": "expense", "member": "ibu"}, {"id": 1000265, "desc": "Bahan renov material", "amount": 1462500, "cat": "Others", "date": "2026-06-07", "type": "expense", "member": "ibu"}, {"id": 1000266, "desc": "Susu, MM choice, loluna, buku", "amount": 805829, "cat": "Others", "date": "2026-06-07", "type": "expense", "member": "ibu"}, {"id": 1000267, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-06-08", "type": "expense", "member": "ibu"}, {"id": 1000268, "desc": "Sarapan", "amount": 12000, "cat": "Breakfast", "date": "2026-06-08", "type": "expense", "member": "ibu"}, {"id": 1000269, "desc": "Jasa tukang 3 hari", "amount": 600000, "cat": "Others", "date": "2026-06-08", "type": "expense", "member": "ibu"}, {"id": 1000270, "desc": "Arisan", "amount": 60000, "cat": "Arisan", "date": "2026-06-08", "type": "expense", "member": "ibu"}, {"id": 1000271, "desc": "AC + pegangan bapak", "amount": 150000, "cat": "Others", "date": "2026-06-08", "type": "expense", "member": "ibu"}, {"id": 1000272, "desc": "Transport pp - Ibun", "amount": 40000, "cat": "Transport", "date": "2026-06-09", "type": "expense", "member": "ibu"}, {"id": 1000273, "desc": "Sarapan, teh dan mie ayam malam", "amount": 59000, "cat": "Breakfast", "date": "2026-06-09", "type": "expense", "member": "ibu"}, {"id": 1000274, "desc": "Roster, glassbox, cat dasar, kabel, kape", "amount": 309000, "cat": "Others", "date": "2026-06-09", "type": "expense", "member": "ibu"}, {"id": 1000275, "desc": "Salary - Ibun", "amount": 8019514, "cat": "Income", "date": "2026-05-25", "type": "income", "member": "ibu"}, {"id": 1000276, "desc": "Lebihan uang April", "amount": 896407, "cat": "Income", "date": "2026-05-25", "type": "income", "member": "ibu"}, {"id": 1000277, "desc": "Nafkah dan belanja", "amount": 900000, "cat": "Income", "date": "2026-05-28", "type": "income", "member": "ibu"}, {"id": 1000278, "desc": "Bonus - Ibun", "amount": 2900000, "cat": "Income", "date": "2026-05-29", "type": "income", "member": "ibu"}, {"id": 1000279, "desc": "Qurban26", "amount": 3700000, "cat": "Qurban", "date": "2026-05-12", "type": "expense", "member": "ibu"}];
+  const existingIds = new Set(transactions.map(t=>t.id));
+  const toAdd = preloaded.filter(t=>!existingIds.has(t.id));
+  if(toAdd.length > 0){ transactions = [...transactions, ...toAdd]; save(); }
 
-    render();
+  buildCatDropdown('mCat');
+  render();
   setupDrop();
 });
+
+// ── NAVIGATION ──
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.getElementById('nb-'+id).classList.add('active');
+  render();
+}
+
+function setMember(m, btn) {
+  curMember = m;
+  document.querySelectorAll('.member-tab').forEach(b=>{
+    b.className = 'member-tab';
+  });
+  btn.className = 'member-tab active-'+m;
+  render();
+}
 
 function changeMonth(d) {
   curMonth += d;
@@ -849,646 +568,434 @@ function changeMonth(d) {
   render();
 }
 
-function showPage(id, btn) {
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
-  document.getElementById('page-'+id).classList.add('active');
-  btn.classList.add('active');
-  render();
-}
-
-function switchInputTab(tab, btn) {
-  document.querySelectorAll('.input-tab').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('tab-image').style.display = tab==='image' ? 'block' : 'none';
-  document.getElementById('tab-note').style.display = tab==='note' ? 'block' : 'none';
-}
-
-function setType(t) {
-  txType = t;
-  document.getElementById('btnExpense').className = 'type-btn' + (t==='expense'?' active-expense':'');
-  document.getElementById('btnIncome').className = 'type-btn' + (t==='income'?' active-income':'');
-}
-
-// ── TOAST ──
-function toast(msg, type='success') {
-  const el = document.getElementById('toast');
-  el.textContent = msg; el.className = 'toast '+type+' show';
-  setTimeout(()=>el.classList.remove('show'), 2800);
-}
-
-// ── FILE UPLOAD ──
-function setupDrop() {
-  const zone = document.getElementById('dropZone');
-  zone.addEventListener('dragover', e=>{ e.preventDefault(); zone.classList.add('drag'); });
-  zone.addEventListener('dragleave', ()=>zone.classList.remove('drag'));
-  zone.addEventListener('drop', e=>{ e.preventDefault(); zone.classList.remove('drag'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
-}
-
-function handleFile(file) {
-  if(!file || !file.type.startsWith('image/')) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const b64 = e.target.result.split(',')[1];
-    currentImageBase64 = b64;
-    currentImageType = file.type;
-    const preview = document.getElementById('imgPreview');
-    preview.src = e.target.result;
-    preview.style.display = 'block';
-  };
-  reader.readAsDataURL(file);
-}
-
-// ── AI SCAN ──
-async function runAI() {
-  const apiKey = getApiKey();
-  if(!apiKey) {
-    document.getElementById('apiBanner').style.display = 'flex';
-    toast('Please enter your Anthropic API key first.', 'error');
-    return;
-  }
-  document.getElementById('apiBanner').style.display = 'none';
-
-  const isImageTab = document.getElementById('tab-image').style.display !== 'none';
-  const noteText = document.getElementById('noteInput').value.trim();
-
-  if(isImageTab && !currentImageBase64) { toast('Please select an image first.', 'error'); return; }
-  if(!isImageTab && !noteText) { toast('Please enter some text to analyze.', 'error'); return; }
-
-  const scanBtn = document.getElementById('scanBtn');
-  const scanStatus = document.getElementById('scanStatus');
-  scanBtn.disabled = true;
-  scanStatus.innerHTML = '<span class="spinner"></span> Analyzing...';
-
-  const systemPrompt = `You are a financial data extractor for an Indonesian family budget app. Extract ALL transactions from the provided receipt image or text note.
-
-Return ONLY a valid JSON array. Each item:
-{
-  "desc": "short description",
-  "amount": number (in IDR, no currency symbol),
-  "category": one of [Food, Transport, Bills, Health, Education, Shopping, Entertainment, Savings, Income, Other],
-  "type": "expense" or "income",
-  "date": "YYYY-MM-DD" or null
-}
-
-Rules:
-- Convert amounts: "150 ribu" = 150000, "5 juta" = 5000000, "1.5jt" = 1500000
-- If multiple items on one receipt, create separate entries for each
-- Salary/gaji = income. Shopping/food/bills = expense
-- If date unclear, use null
-- Return ONLY the JSON array, no explanation`;
-
-  let messages;
-  if(isImageTab) {
-    messages = [{
-      role: 'user',
-      content: [
-        { type: 'image', source: { type: 'base64', media_type: currentImageType, data: currentImageBase64 }},
-        { type: 'text', text: 'Extract all transactions from this receipt/bill image. Return JSON array only.' }
-      ]
-    }];
-  } else {
-    messages = [{ role: 'user', content: noteText }];
-  }
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model: 'claude-opus-4-6', max_tokens: 1500, system: systemPrompt, messages })
-    });
-
-    if(!res.ok) { const e = await res.json(); throw new Error(e.error?.message || 'API error'); }
-    const data = await res.json();
-    const raw = data.content.map(c=>c.text||'').join('').trim();
-
-    let parsed;
-    try {
-      const clean = raw.replace(/```json|```/g,'').trim();
-      parsed = JSON.parse(clean);
-    } catch(e) {
-      throw new Error('Could not parse AI response. Try again.');
-    }
-
-    if(!Array.isArray(parsed) || parsed.length===0) throw new Error('No transactions found.');
-
-    extractedItems = parsed.map(item => ({
-      ...item,
-      date: item.date || new Date().toISOString().slice(0,10),
-      amount: parseFloat(item.amount) || 0
-    }));
-
-    renderAIResults();
-    scanStatus.textContent = `Found ${extractedItems.length} transaction${extractedItems.length>1?'s':''}.`;
-    toast(`Extracted ${extractedItems.length} transaction(s)!`);
-
-  } catch(err) {
-    toast(err.message, 'error');
-    scanStatus.textContent = '';
-  } finally {
-    scanBtn.disabled = false;
-  }
-}
-
-function renderAIResults() {
-  const container = document.getElementById('aiResultItems');
-  container.innerHTML = extractedItems.map((item, i) => `
-    <div class="ai-result-item" id="ai-item-${i}">
-      <div class="ai-result-row">
-        <span class="ai-badge ${item.type}">${item.type === 'income' ? '💵 Income' : '💸 Expense'}</span>
-        <span style="font-size:13px;color:var(--text3);">${item.date || ''}</span>
-        <button onclick="removeExtracted(${i})" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px;">✕</button>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;">
-        <input type="text" value="${item.desc}" onchange="extractedItems[${i}].desc=this.value" style="flex:1;min-width:150px;padding:6px 10px;font-size:14px;border:1px solid var(--border);border-radius:8px;font-family:inherit;background:var(--surface);color:var(--text);">
-        <input type="number" value="${item.amount}" onchange="extractedItems[${i}].amount=parseFloat(this.value)||0" style="width:130px;padding:6px 10px;font-size:14px;border:1px solid var(--border);border-radius:8px;font-family:inherit;background:var(--surface);color:var(--text);">
-        <select onchange="extractedItems[${i}].category=this.value" style="padding:6px 10px;font-size:14px;border:1px solid var(--border);border-radius:8px;font-family:inherit;background:var(--surface);color:var(--text);">
-          ${CATS.map(c=>`<option value="${c}" ${c===item.category?'selected':''}>${CAT_EMOJI[c]} ${c}</option>`).join('')}
-        </select>
-      </div>
-    </div>
-  `).join('');
-  document.getElementById('aiResults').style.display = 'block';
-}
-
-function removeExtracted(i) {
-  extractedItems.splice(i,1);
-  if(extractedItems.length===0) clearAI();
-  else renderAIResults();
-}
-
-function clearAI() {
-  extractedItems = [];
-  document.getElementById('aiResults').style.display = 'none';
-  document.getElementById('scanStatus').textContent = '';
-  currentImageBase64 = null;
-  document.getElementById('imgPreview').style.display = 'none';
-  document.getElementById('noteInput').value = '';
-  document.getElementById('fileInput').value = '';
-}
-
-function addAllExtracted() {
-  if(extractedItems.length===0) return;
-  extractedItems.forEach(item => {
-    transactions.push({
-      id: Date.now() + Math.random(),
-      desc: item.desc,
-      amount: item.amount,
-      cat: item.category,
-      date: item.date || new Date().toISOString().slice(0,10),
-      type: item.type
-    });
-  });
-  save();
-  toast(`Added ${extractedItems.length} transaction(s)!`);
-  clearAI();
-  render();
-}
-
-// ── MANUAL ADD ──
-function addManual() {
-  const desc = document.getElementById('mDesc').value.trim();
-  const amount = parseFloat(document.getElementById('mAmount').value) || 0;
-  const cat = document.getElementById('mCat').value;
-  const date = document.getElementById('mDate').value || new Date().toISOString().slice(0,10);
-  if(!desc) { toast('Enter a description.', 'error'); return; }
-  if(amount <= 0) { toast('Enter a valid amount.', 'error'); return; }
-  transactions.push({ id: Date.now(), desc, amount, cat, date, type: txType });
-  save();
-  document.getElementById('mDesc').value = '';
-  document.getElementById('mAmount').value = '';
-  toast('Transaction added!');
-  render();
-}
-
-// ── GOALS ──
-function addGoal() {
-  const name = document.getElementById('gName').value.trim();
-  const target = parseFloat(document.getElementById('gTarget').value) || 0;
-  const saved = parseFloat(document.getElementById('gSaved').value) || 0;
-  if(!name) { toast('Enter a goal name.', 'error'); return; }
-  goals.push({ id: Date.now(), name, target, saved });
-  save();
-  document.getElementById('gName').value = '';
-  document.getElementById('gTarget').value = '';
-  document.getElementById('gSaved').value = '';
-  toast('Goal created!');
-  render();
-}
-
-function addToGoal(i, val) {
-  if(val > 0) { goals[i].saved += val; save(); render(); }
-}
-
-function deleteGoal(i) { goals.splice(i,1); save(); render(); }
-function deleteTx(id) { transactions = transactions.filter(t=>t.id!==id); save(); render(); }
-
-// ── FILTER & MONTH ──
+// ── FILTER ──
 function getMonthTx() {
   return transactions.filter(t => {
     const d = new Date(t.date);
-    return d.getFullYear()===curYear && d.getMonth()===curMonth;
+    const inMonth = d.getFullYear()===curYear && d.getMonth()===curMonth;
+    if(!inMonth) return false;
+    if(curMember==='family') return true;
+    return (t.member||'ayah') === curMember;
   });
 }
 
 // ── RENDER ──
 function render() {
-  const label = MONTHS[curMonth] + ' ' + curYear;
-  document.getElementById('monthLabel').textContent = label;
-  const el2 = document.getElementById('txMonthLabel2');
-  if(el2) el2.textContent = label;
-
+  document.getElementById('monthLabel').textContent = MONTHS[curMonth]+' '+curYear;
   const mtx = getMonthTx();
   const income = mtx.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
   const expense = mtx.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
   const balance = income - expense;
-  const rate = income > 0 ? Math.round((balance/income)*100) : 0;
+  const rate = income>0?Math.round((balance/income)*100):0;
 
-  document.getElementById('m-income').textContent = fmtShort(income);
-  document.getElementById('m-expense').textContent = fmtShort(expense);
+  document.getElementById('m-income').textContent = fmtS(income);
+  document.getElementById('m-expense').textContent = fmtS(expense);
   const bEl = document.getElementById('m-balance');
-  bEl.textContent = fmtShort(balance);
-  bEl.className = 'metric-value ' + (balance>=0?'green':'red');
+  bEl.textContent = fmtS(balance);
+  bEl.className = 'metric-value '+(balance>=0?'green':'red');
   const rEl = document.getElementById('m-rate');
-  rEl.textContent = rate + '%';
-  rEl.className = 'metric-value ' + (rate>=20?'green':rate<0?'red':'');
+  rEl.textContent = rate+'%';
+  rEl.className = 'metric-value '+(rate>=20?'green':rate<0?'red':'');
 
-  renderTxList(mtx);
   renderCharts(mtx);
-  renderBudgetPage(mtx);
+  renderTxRecent(mtx);
+  renderTxFull();
+  renderBudget(mtx);
   renderGoals();
-  renderTransactions();
-  buildBudgetInputs();
 }
 
-function renderTxList(mtx) {
-  const el = document.getElementById('txList');
-  const recent = [...mtx].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10);
-  document.getElementById('txCount').textContent = mtx.length + ' transactions';
-  if(recent.length===0){
-    el.innerHTML='<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">No transactions this month.</div></div>';
-    return;
-  }
-  el.innerHTML = '<div class="tx-list">'+recent.map(t=>`
-    <div class="tx-item">
-      <div class="tx-icon" style="background:${t.type==='income'?'#D8EDDF':'#FDECEA'}">${CAT_EMOJI[t.cat]||'📌'}</div>
-      <div class="tx-info">
-        <div class="tx-name">${t.desc}</div>
-        <div class="tx-meta">${t.cat} · ${t.date}</div>
-      </div>
-      <div class="tx-amount ${t.type==='income'?'in':'out'}">${t.type==='income'?'+':'-'}${fmtShort(t.amount)}</div>
-      <button class="tx-del" onclick="openEditModal(${t.id})" title="Edit" style="opacity:0;background:none;border:none;cursor:pointer;color:var(--blue);padding:4px;border-radius:6px;font-size:13px;font-weight:600;">✏️</button>
-      <button class="tx-del" onclick="deleteTx(${t.id})" title="Delete">✕</button>
-    </div>`).join('')+'</div>';
+function renderTxRecent(mtx) {
+  const el = document.getElementById('txRecent');
+  document.getElementById('txCount').textContent = mtx.length+' transaksi';
+  const recent = [...mtx].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8);
+  if(!recent.length){el.innerHTML='<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Belum ada transaksi bulan ini.</div></div>';return;}
+  el.innerHTML = '<div class="tx-list">'+recent.map(t=>txItemHtml(t,true)).join('')+'</div>';
 }
 
-function renderTransactions() {
-  const el = document.getElementById('txListFull');
+function renderTxFull() {
+  const el = document.getElementById('txFull');
   if(!el) return;
-  const filterCat = document.getElementById('filterCat').value;
-  const filterType = document.getElementById('filterType').value;
   let mtx = getMonthTx();
+  const fType = document.getElementById('filterType').value;
+  if(fType) mtx = mtx.filter(t=>t.type===fType);
   if(filterCat) mtx = mtx.filter(t=>t.cat===filterCat);
-  if(filterType) mtx = mtx.filter(t=>t.type===filterType);
   mtx.sort((a,b)=>b.date.localeCompare(a.date));
-  // populate filter
-  const allCats = [...new Set(transactions.map(t=>t.cat))];
-  const catSel = document.getElementById('filterCat');
-  const cur = catSel.value;
-  catSel.innerHTML = '<option value="">All categories</option>' + allCats.map(c=>`<option value="${c}" ${c===cur?'selected':''}>${CAT_EMOJI[c]||''} ${c}</option>`).join('');
-  if(mtx.length===0){
-    el.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">No transactions match this filter.</div></div>';
-    return;
-  }
-  el.innerHTML = '<div class="tx-list">'+mtx.map(t=>`
-    <div class="tx-item">
-      <div class="tx-icon" style="background:${t.type==='income'?'#D8EDDF':'#FDECEA'}">${CAT_EMOJI[t.cat]||'📌'}</div>
-      <div class="tx-info">
-        <div class="tx-name">${t.desc}</div>
-        <div class="tx-meta">${t.cat} · ${t.date}</div>
-      </div>
-      <div class="tx-amount ${t.type==='income'?'in':'out'}">${t.type==='income'?'+':'-'}${fmt(t.amount)}</div>
-      <button class="tx-edit" onclick="openEditModal(${t.id})" title="Edit">✏️ Edit</button>
-      <button class="tx-del" onclick="deleteTx(${t.id})" title="Delete">✕</button>
-    </div>`).join('')+'</div>';
+
+  // Build cat filter chips
+  const allCats = [...new Set(getMonthTx().map(t=>t.cat))].sort();
+  const chipsEl = document.getElementById('catFilters');
+  chipsEl.innerHTML = ['<button class="chip'+(filterCat===''?' active':'')+'" onclick="setCatFilter(\'\',this)">Semua</button>',
+    ...allCats.map(c=>`<button class="chip${filterCat===c?' active':''}" onclick="setCatFilter('${c}',this)">${CAT_EMOJI[c]||''} ${c}</button>`)
+  ].join('');
+
+  if(!mtx.length){el.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Tidak ada transaksi.</div></div>';return;}
+  el.innerHTML = '<div class="tx-list">'+mtx.map(t=>txItemHtml(t,false)).join('')+'</div>';
+}
+
+function setCatFilter(cat, btn) {
+  filterCat = cat;
+  renderTxFull();
+}
+
+function txItemHtml(t, short) {
+  const showBadge = curMember==='family';
+  const isAyah = (t.member||'ayah')==='ayah';
+  const badge = showBadge ? `<span class="mbadge ${isAyah?'mbadge-ayah':'mbadge-ibu'}">${isAyah?'👨 Ayah':'👩 Ibu'}</span>` : '';
+  return `<div class="tx-item" onclick="openEdit(${t.id})">
+    <div class="tx-icon" style="background:${t.type==='income'?'var(--green-light)':'var(--red-light)'}">${CAT_EMOJI[t.cat]||'📌'}</div>
+    <div class="tx-info">
+      <div class="tx-name">${t.desc||'(tanpa keterangan)'}</div>
+      <div class="tx-meta">${t.cat} · ${t.date} ${badge}</div>
+    </div>
+    <div class="tx-right">
+      <div class="tx-amount ${t.type==='income'?'in':'out'}">${t.type==='income'?'+':'-'}${short?fmtS(t.amount):fmt(t.amount)}</div>
+    </div>
+  </div>`;
 }
 
 function renderCharts(mtx) {
   // Pie
   const catTotals = {};
-  mtx.filter(t=>t.type==='expense').forEach(t=>{ catTotals[t.cat]=(catTotals[t.cat]||0)+t.amount; });
-  const pieLabels = Object.keys(catTotals), pieData = Object.values(catTotals);
-  const pieColors = pieLabels.map(l=>CAT_COLORS[CATS.indexOf(l)]||'#888');
+  mtx.filter(t=>t.type==='expense').forEach(t=>{catTotals[t.cat]=(catTotals[t.cat]||0)+t.amount;});
+  const pLabels=Object.keys(catTotals), pData=Object.values(catTotals);
+  const pColors=pLabels.map(l=>CAT_COLORS[CATS.indexOf(l)%CAT_COLORS.length]||'#888');
   if(pieInst){pieInst.destroy();pieInst=null;}
-  if(pieData.length>0){
-    pieInst = new Chart(document.getElementById('pieChart'),{
-      type:'doughnut',
-      data:{labels:pieLabels,datasets:[{data:pieData,backgroundColor:pieColors,borderWidth:2,borderColor:'#fff'}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'60%'}
-    });
-    const tot = pieData.reduce((s,v)=>s+v,0);
-    document.getElementById('pieLegend').innerHTML = pieLabels.map((l,i)=>`
-      <span style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text2);">
-        <span style="width:10px;height:10px;border-radius:2px;background:${pieColors[i]};display:inline-block;flex-shrink:0;"></span>
-        ${l} ${Math.round(pieData[i]/tot*100)}%
-      </span>`).join('');
+  const pieCanvas = document.getElementById('pieChart');
+  if(pData.length){
+    pieInst=new Chart(pieCanvas,{type:'doughnut',data:{labels:pLabels,datasets:[{data:pData,backgroundColor:pColors,borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'58%'}});
+    const tot=pData.reduce((s,v)=>s+v,0);
+    document.getElementById('pieLegend').innerHTML=pLabels.map((l,i)=>`<span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2);font-weight:600;"><span style="width:9px;height:9px;border-radius:2px;background:${pColors[i]};display:inline-block;flex-shrink:0;"></span>${l} ${Math.round(pData[i]/tot*100)}%</span>`).join('');
+  } else {
+    pieCanvas.parentElement.innerHTML='<div class="empty"><div class="empty-icon">📊</div><div class="empty-text">Belum ada pengeluaran bulan ini.</div></div>';
+    document.getElementById('pieLegend').innerHTML='';
   }
 
-  // Bar (last 6 months)
-  const barLabels=[], barIncome=[], barExpense=[];
+  // Bar
+  const bLabels=[],bInc=[],bExp=[];
   for(let i=5;i>=0;i--){
-    let m=curMonth-i, y=curYear;
+    let m=curMonth-i,y=curYear;
     if(m<0){m+=12;y--;}
-    barLabels.push(MONTHS[m].slice(0,3));
-    const mtxM = transactions.filter(t=>{ const d=new Date(t.date); return d.getFullYear()===y && d.getMonth()===m; });
-    barIncome.push(Math.round(mtxM.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0)));
-    barExpense.push(Math.round(mtxM.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0)));
+    bLabels.push(MONTHS[m].slice(0,3));
+    const mx=transactions.filter(t=>{
+      const d=new Date(t.date);
+      const inM=d.getFullYear()===y&&d.getMonth()===m;
+      if(!inM) return false;
+      if(curMember==='family') return true;
+      return (t.member||'ayah')===curMember;
+    });
+    bInc.push(mx.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0));
+    bExp.push(mx.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0));
   }
   if(barInst){barInst.destroy();barInst=null;}
-  barInst = new Chart(document.getElementById('barChart'),{
-    type:'bar',
-    data:{labels:barLabels,datasets:[
-      {label:'Income',data:barIncome,backgroundColor:'#2D6A4F',borderRadius:4},
-      {label:'Expenses',data:barExpense,backgroundColor:'#C0392B',borderRadius:4}
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{ticks:{callback:v=>fmtShort(v)},grid:{color:'#eee'}}}}
-  });
+  barInst=new Chart(document.getElementById('barChart'),{type:'bar',data:{labels:bLabels,datasets:[{label:'Pemasukan',data:bInc,backgroundColor:'#1D8A5E',borderRadius:4},{label:'Pengeluaran',data:bExp,backgroundColor:'#C73535',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:11},boxWidth:10}}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{ticks:{callback:v=>fmtS(v),font:{size:10}},grid:{color:'#eee'}}}}});
 }
 
-function buildBudgetInputs() {
-  renderBudgetTable();
-  renderCatManageList();
-}
+function renderBudget(mtx) {
+  if(!mtx) mtx=getMonthTx();
+  const catTotals={};
+  mtx.filter(t=>t.type==='expense').forEach(t=>{catTotals[t.cat]=(catTotals[t.cat]||0)+t.amount;});
+  const catBg={Food:'#D6F0E4',Transport:'#DBE9FC','Transport Car':'#DBE9FC','Transport Motor':'#DBE9FC','Home debt':'#FCEAEA',Electricity:'#FEF3DC',Water:'#DBE9FC',Internet:'#EDE9FE',Utilities:'#F9E0EA',Shopping:'#FEF3DC'};
 
-function toggleManageCats() {
-  const panel = document.getElementById('manageCatsPanel');
-  const btn = document.getElementById('manageCatsBtn');
-  const open = panel.style.display === 'none';
-  panel.style.display = open ? 'block' : 'none';
-  btn.textContent = open ? '✕ Close' : '⚙ Manage categories';
-  if(open) renderCatManageList();
-}
-
-function renderCatManageList() {
-  const el = document.getElementById('catManageList');
-  if(!el) return;
-  el.innerHTML = CATS.map((cat, i) => `
-    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
-      <input type="text" value="${CAT_EMOJI[cat]||'📌'}" maxlength="2"
-        style="width:40px;font-size:16px;text-align:center;padding:4px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);"
-        onchange="updateCatEmoji(${i}, this.value)">
-      <input type="text" value="${cat}"
-        style="flex:1;padding:6px 10px;font-size:14px;font-weight:500;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);"
-        onchange="renameCategory(${i}, this.value)"
-        onkeydown="if(event.key==='Enter')this.blur();">
-      ${cat === 'Income' ? '<span style="font-size:12px;color:var(--text3);padding:0 8px;">required</span>' :
-        `<button onclick="deleteCategory(${i})" style="padding:5px 10px;background:var(--danger-light);color:var(--danger);border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">✕</button>`}
-    </div>`).join('');
-}
-
-function addCategory() {
-  const name = document.getElementById('newCatName').value.trim();
-  const emoji = document.getElementById('newCatEmoji').value.trim() || '📌';
-  if(!name) { toast('Enter a category name.', 'error'); return; }
-  if(CATS.includes(name)) { toast('Category already exists.', 'error'); return; }
-  CATS.push(name);
-  CAT_EMOJI[name] = emoji;
-  save();
-  document.getElementById('newCatName').value = '';
-  document.getElementById('newCatEmoji').value = '';
-  renderCatManageList();
-  renderBudgetTable();
-  refreshCatDropdowns();
-  toast('Category added!');
-}
-
-function renameCategory(i, newName) {
-  newName = newName.trim();
-  if(!newName || newName === CATS[i]) return;
-  if(CATS.includes(newName)) { toast('Name already exists.', 'error'); return; }
-  const oldName = CATS[i];
-  // Update transactions
-  transactions.forEach(t => { if(t.cat === oldName) t.cat = newName; });
-  // Update budgets
-  if(budgets[oldName] !== undefined) { budgets[newName] = budgets[oldName]; delete budgets[oldName]; }
-  // Update emoji
-  CAT_EMOJI[newName] = CAT_EMOJI[oldName] || '📌';
-  delete CAT_EMOJI[oldName];
-  CATS[i] = newName;
-  save();
-  renderBudgetTable();
-  renderCatManageList();
-  refreshCatDropdowns();
-  toast('Category renamed!');
-}
-
-function updateCatEmoji(i, emoji) {
-  const cat = CATS[i];
-  CAT_EMOJI[cat] = emoji || '📌';
-  save();
-  renderBudgetTable();
-}
-
-function deleteCategory(i) {
-  const cat = CATS[i];
-  if(cat === 'Income') return;
-  if(transactions.some(t => t.cat === cat)) {
-    if(!confirm('This category has transactions. They will be moved to "Other". Continue?')) return;
-    transactions.forEach(t => { if(t.cat === cat) t.cat = 'Other'; });
-  }
-  delete budgets[cat];
-  delete CAT_EMOJI[cat];
-  CATS.splice(i, 1);
-  save();
-  renderCatManageList();
-  renderBudgetTable();
-  refreshCatDropdowns();
-  toast('Category deleted.');
-}
-
-function refreshCatDropdowns() {
-  // Update the category dropdowns in manual add & transactions filter
-  const mCat = document.getElementById('mCat');
-  const filterCat = document.getElementById('filterCat');
-  if(mCat) {
-    const cur = mCat.value;
-    mCat.innerHTML = CATS.map(c => `<option value="${c}" ${c===cur?'selected':''}>${CAT_EMOJI[c]||'📌'} ${c}</option>`).join('');
-  }
-  if(filterCat) {
-    const cur = filterCat.value;
-    filterCat.innerHTML = '<option value="">All categories</option>' + [...new Set(transactions.map(t=>t.cat))].map(c=>`<option value="${c}" ${c===cur?'selected':''}>${CAT_EMOJI[c]||''} ${c}</option>`).join('');
-  }
-}
-
-function renderBudgetTable() {
-  const mtx = getMonthTx();
-  const catTotals = {};
-  mtx.filter(t=>t.type==='expense').forEach(t=>{ catTotals[t.cat]=(catTotals[t.cat]||0)+t.amount; });
-  const catBgColors = {Food:'#D8EDDF',Transport:'#DDEAF8',Bills:'#FEF3DC',Health:'#FDECEA',Education:'#EDE9FE',Shopping:'#FEF3DC',Entertainment:'#D8EDDF',Savings:'#EDE9FE',Other:'#F0EEE8'};
-  const el = document.getElementById('budgetTable');
-  if(!el) return;
-  el.innerHTML = `<table class="budget-table">
-    <thead><tr style="border-bottom:2px solid var(--border);">
-      <td style="padding:8px 6px;font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;">Category</td>
-      <td style="padding:8px 6px;font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;text-align:right;">Spent this month</td>
-      <td style="padding:8px 6px;font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;text-align:right;">Budget limit (click to edit)</td>
-    </tr></thead>
-    <tbody>
-    ${CATS.filter(c=>c!=='Income').map(cat => {
-      const spent = catTotals[cat]||0;
-      const budget = budgets[cat]||0;
-      const over = budget>0 && spent>budget;
-      const near = budget>0 && spent/budget>=0.8 && !over;
-      const statusColor = over?'#C0392B':near?'#B7770D':'#2D6A4F';
-      return `<tr>
-        <td>
-          <div class="budget-cat-cell">
-            <div class="budget-cat-icon" style="background:${catBgColors[cat]||'#F0EEE8'}">${CAT_EMOJI[cat]||'📌'}</div>
-            <div>
-              <div class="budget-cat-name">${cat}</div>
-              ${budget>0?`<div style="font-size:11px;color:${statusColor};font-weight:600;">${over?'⚠ Over budget!':near?'⚡ Near limit':'✓ On track'}</div>`:'<div style="font-size:11px;color:var(--text3);">No limit set</div>'}
-            </div>
-          </div>
-        </td>
-        <td class="budget-spent-cell">${spent>0?fmt(spent):'—'}</td>
-        <td class="budget-amount-cell">
-          <input type="number" min="0"
-            class="budget-inline-input"
-            placeholder="Tap to set limit"
-            value="${budget||''}"
-            title="Click to edit budget for ${cat}"
-            onchange="budgets['${cat}']=parseFloat(this.value)||0;save();renderBudgetTable();renderBudgetBars();"
-            onkeydown="if(event.key==='Enter')this.blur();">
-        </td>
-      </tr>`;
-    }).join('')}
-    </tbody>
-  </table>`;
-  const total = CATS.filter(c=>c!=='Income').reduce((s,c)=>s+(budgets[c]||0),0);
-  const totalEl = document.getElementById('totalBudget');
-  if(totalEl) totalEl.textContent = fmt(total);
-}
-
-function renderBudgetPage(mtx) {
-  renderBudgetTable();
-  renderBudgetBars(mtx);
-}
-
-function renderBudgetBars(mtx) {
-  if(!mtx) mtx = getMonthTx();
-  const catTotals = {};
-  mtx.filter(t=>t.type==='expense').forEach(t=>{ catTotals[t.cat]=(catTotals[t.cat]||0)+t.amount; });
-  const active = CATS.filter(c=>c!=='Income' && (budgets[c]||catTotals[c]));
-  const el = document.getElementById('budgetBars');
-  if(active.length===0){
-    el.innerHTML='<div class="empty"><div class="empty-icon">📊</div><div class="empty-text">Set budgets on the left to track spending.</div></div>';
-    return;
-  }
-  el.innerHTML = active.map(cat => {
-    const spent = catTotals[cat]||0, budget = budgets[cat]||0;
-    const pct = budget > 0 ? Math.min(100, Math.round(spent/budget*100)) : 0;
-    const over = budget > 0 && spent > budget;
-    const color = over ? '#C0392B' : pct>=80 ? '#B7770D' : '#2D6A4F';
-    return `<div class="budget-row">
-      <div class="budget-row-top">
-        <span class="budget-cat">${CAT_EMOJI[cat]} ${cat}</span>
-        <span class="budget-numbers">${fmtShort(spent)}${budget?' / '+fmtShort(budget):''}${over?' <span style="color:#C0392B;font-weight:600">over!</span>':''}</span>
+  // Budget table
+  const tableEl=document.getElementById('budgetTable');
+  tableEl.innerHTML=CATS.filter(c=>c!=='Income').map(cat=>{
+    const spent=catTotals[cat]||0, budget=budgets[cat]||0;
+    const over=budget>0&&spent>budget, near=budget>0&&spent/budget>=0.8&&!over;
+    const sc=over?'var(--red)':near?'var(--text2)':'var(--green)';
+    const statusTxt=budget>0?(over?'⚠ Melebihi!':near?'⚡ Hampir batas':'✓ Aman'):'Belum diatur';
+    return `<div class="brow">
+      <div class="brow-icon" style="background:${catBg[cat]||'var(--surface2)'}">${CAT_EMOJI[cat]||'📌'}</div>
+      <div class="brow-info">
+        <div class="brow-name">${cat}</div>
+        <div class="brow-status" style="color:${sc}">${statusTxt}</div>
       </div>
-      ${budget?`<div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>`:'<div style="height:4px;background:var(--surface2);border-radius:4px;"></div>'}
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:2px;">${spent>0?fmtS(spent):'—'}</div>
+        <input type="number" min="0" class="brow-input" placeholder="Tap untuk atur"
+          value="${budget||''}"
+          onchange="budgets['${cat}']=parseFloat(this.value)||0;save();renderBudget();"
+          onkeydown="if(event.key==='Enter')this.blur();">
+      </div>
+    </div>`;
+  }).join('');
+
+  // Total
+  const total=CATS.filter(c=>c!=='Income').reduce((s,c)=>s+(budgets[c]||0),0);
+  document.getElementById('totalBudget').textContent=fmt(total);
+
+  // Budget bars
+  const active=CATS.filter(c=>c!=='Income'&&(budgets[c]||catTotals[c]));
+  const barsEl=document.getElementById('budgetBars');
+  if(!active.length){barsEl.innerHTML='<div class="empty"><div class="empty-icon">📊</div><div class="empty-text">Atur anggaran di atas untuk mulai tracking.</div></div>';return;}
+  barsEl.innerHTML=active.map(cat=>{
+    const spent=catTotals[cat]||0,budget=budgets[cat]||0;
+    const pct=budget>0?Math.min(100,Math.round(spent/budget*100)):0;
+    const over=budget>0&&spent>budget;
+    const color=over?'var(--red)':pct>=80?'#B7770D':'var(--green)';
+    return `<div style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;">
+        <span style="font-weight:600;">${CAT_EMOJI[cat]||''} ${cat}</span>
+        <span style="color:var(--text3);">${fmtS(spent)}${budget?' / '+fmtS(budget):''} ${over?'<span style="color:var(--red);font-weight:700;">!':''}</span>
+      </div>
+      ${budget?`<div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>`:''}
     </div>`;
   }).join('');
 }
 
 function renderGoals() {
-  const el = document.getElementById('goalsList');
-  if(!el) return;
-  if(goals.length===0){
-    el.innerHTML='<div class="card"><div class="empty"><div class="empty-icon">🎯</div><div class="empty-text">No goals yet. Create one on the left!</div></div></div>';
-    return;
-  }
-  el.innerHTML = goals.map((g,i)=>{
-    const pct = g.target>0 ? Math.min(100,Math.round(g.saved/g.target*100)) : 0;
-    const color = pct>=100?'#2D6A4F':pct>=50?'#1A5F9E':'#B7770D';
-    return `<div class="goal-card mb-1">
-      <div class="goal-top">
-        <div>
-          <div class="goal-name">${g.name}</div>
-          <div style="font-size:13px;color:var(--text3);margin-top:2px;">${fmt(g.saved)} of ${fmt(g.target)}</div>
-        </div>
-        <div class="goal-pct" style="color:${color}">${pct}%</div>
+  const el=document.getElementById('goalsList');
+  if(!el)return;
+  if(!goals.length){el.innerHTML='<div class="card"><div class="empty"><div class="empty-icon">🎯</div><div class="empty-text">Belum ada target tabungan.</div></div></div>';return;}
+  el.innerHTML=goals.map((g,i)=>{
+    const pct=g.target>0?Math.min(100,Math.round(g.saved/g.target*100)):0;
+    const color=pct>=100?'var(--green)':pct>=50?'var(--blue)':'#B7770D';
+    return `<div class="goal-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+        <div><div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;">${g.name}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px;">${fmt(g.saved)} dari ${fmt(g.target)}</div></div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;color:${color}">${pct}%</div>
       </div>
-      <div class="bar-track" style="height:10px;"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
-      <div style="display:flex;gap:8px;margin-top:12px;align-items:center;">
-        <input type="number" min="0" placeholder="Add (Rp)" id="g-add-${i}" class="form-control" style="flex:1;font-size:13px;padding:6px 10px;">
-        <button class="btn btn-primary btn-sm" onclick="addToGoal(${i}, parseFloat(document.getElementById('g-add-${i}').value)||0);document.getElementById('g-add-${i}').value=''">Add</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteGoal(${i})">Delete</button>
+      <div class="bar-track" style="height:9px;"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <input type="number" min="0" placeholder="Tambah (Rp)" id="ga-${i}" class="form-control" style="flex:1;font-size:13px;padding:7px 10px;">
+        <button class="btn btn-primary btn-sm" onclick="addToGoal(${i})">+</button>
+        <button class="btn btn-danger btn-sm" onclick="delGoal(${i})">✕</button>
       </div>
     </div>`;
   }).join('');
 }
 
-let editingTxId = null;
-let editTxType = 'expense';
+// ── ACTIONS ──
+function setType(t) {
+  txType=t;
+  document.getElementById('btnExpense').className='type-btn'+(t==='expense'?' ae':'');
+  document.getElementById('btnIncome').className='type-btn'+(t==='income'?' ai':'');
+}
+function setAddMember(m) {
+  addMember=m;
+  document.getElementById('mbtnAyah').className='mem-btn'+(m==='ayah'?' ma':'');
+  document.getElementById('mbtnIbu').className='mem-btn'+(m==='ibu'?' mi':'');
+}
 
-function openEditModal(id) {
-  const t = transactions.find(t => t.id === id);
-  if(!t) return;
-  editingTxId = id;
-  editTxType = t.type;
-  document.getElementById('editDesc').value = t.desc;
-  document.getElementById('editAmount').value = t.amount;
-  document.getElementById('editDate').value = t.date;
-  // Populate category dropdown
-  const sel = document.getElementById('editCat');
-  sel.innerHTML = CATS.map(c => `<option value="${c}" ${c===t.cat?'selected':''}>${CAT_EMOJI[c]||'📌'} ${c}</option>`).join('');
-  sel.value = t.cat;
-  // Set type buttons
+function addManual() {
+  const desc=document.getElementById('mDesc').value.trim();
+  const amount=parseFloat(document.getElementById('mAmount').value)||0;
+  const cat=document.getElementById('mCat').value;
+  const date=document.getElementById('mDate').value||new Date().toISOString().slice(0,10);
+  if(!desc){toast('Masukkan keterangan.','error');return;}
+  if(amount<=0){toast('Masukkan jumlah yang valid.','error');return;}
+  transactions.push({id:Date.now(),desc,amount,cat,date,type:txType,member:addMember});
+  save();
+  document.getElementById('mDesc').value='';
+  document.getElementById('mAmount').value='';
+  toast('Transaksi ditambahkan! ✅','success');
+  render();
+}
+
+function addGoal() {
+  const name=document.getElementById('gName').value.trim();
+  const target=parseFloat(document.getElementById('gTarget').value)||0;
+  const saved=parseFloat(document.getElementById('gSaved').value)||0;
+  if(!name){toast('Masukkan nama target.','error');return;}
+  goals.push({id:Date.now(),name,target,saved});
+  save();
+  ['gName','gTarget','gSaved'].forEach(id=>document.getElementById(id).value='');
+  toast('Target dibuat!','success');
+  renderGoals();
+}
+function addToGoal(i) {
+  const v=parseFloat(document.getElementById('ga-'+i).value)||0;
+  if(v>0){goals[i].saved+=v;save();renderGoals();}
+}
+function delGoal(i){goals.splice(i,1);save();renderGoals();}
+function deleteTx(id){transactions=transactions.filter(t=>t.id!==id);save();render();}
+
+// ── EDIT MODAL ──
+function openEdit(id) {
+  const t=transactions.find(t=>t.id===id);
+  if(!t)return;
+  editingId=id; editTxType=t.type; editMemberVal=t.member||'ayah';
+  document.getElementById('eDesc').value=t.desc||''
+  document.getElementById('eAmount').value=t.amount;
+  document.getElementById('eDate').value=t.date;
+  const sel=document.getElementById('eCat');
+  sel.innerHTML=CATS.map(c=>`<option value="${c}" ${c===t.cat?'selected':''}>` + (CAT_EMOJI[c]||'')+' '+c+'</option>').join('');
   setEditType(t.type);
-  document.getElementById('editModal').style.display = 'flex';
+  setEditMember(t.member||'ayah');
+  document.getElementById('editModal').classList.add('open');
+}
+function closeEdit(){document.getElementById('editModal').classList.remove('open');editingId=null;}
+function setEditType(t){
+  editTxType=t;
+  document.getElementById('eBtnExp').className='type-btn'+(t==='expense'?' ae':'');
+  document.getElementById('eBtnInc').className='type-btn'+(t==='income'?' ai':'');
+}
+function setEditMember(m){
+  editMemberVal=m;
+  document.getElementById('eBtnAyah').className='mem-btn'+(m==='ayah'?' ma':'');
+  document.getElementById('eBtnIbu').className='mem-btn'+(m==='ibu'?' mi':'');
+}
+function saveEdit(){
+  const desc=document.getElementById('eDesc').value.trim();
+  const amount=parseFloat(document.getElementById('eAmount').value)||0;
+  const cat=document.getElementById('eCat').value;
+  const date=document.getElementById('eDate').value;
+  if(!desc){toast('Masukkan keterangan.','error');return;}
+  if(amount<=0){toast('Jumlah tidak valid.','error');return;}
+  const idx=transactions.findIndex(t=>t.id===editingId);
+  if(idx===-1)return;
+  transactions[idx]={...transactions[idx],desc,amount,cat,date,type:editTxType,member:editMemberVal};
+  save();closeEdit();toast('Transaksi diperbarui! ✅','success');render();
+}
+function deleteFromEdit(){
+  if(!confirm('Hapus transaksi ini?')||!editingId)return;
+  transactions=transactions.filter(t=>t.id!==editingId);
+  save();closeEdit();toast('Transaksi dihapus.');render();
 }
 
-function closeEditModal() {
-  document.getElementById('editModal').style.display = 'none';
-  editingTxId = null;
+// ── CATEGORY MANAGEMENT ──
+function toggleCatPanel(){
+  const p=document.getElementById('catPanel');
+  const open=p.style.display==='none';
+  p.style.display=open?'block':'none';
+  if(open)renderCatManage();
+}
+function renderCatManage(){
+  document.getElementById('catManageList').innerHTML=CATS.map((cat,i)=>`
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border);">
+      <input type="text" value="${CAT_EMOJI[cat]||'📌'}" maxlength="2" style="width:36px;font-size:14px;text-align:center;padding:4px;border:1.5px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);" onchange="updateEmoji(${i},this.value)">
+      <input type="text" value="${cat}" style="flex:1;padding:6px 8px;font-size:13px;font-weight:600;border:1.5px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);" onchange="renameCat(${i},this.value)" onkeydown="if(event.key==='Enter')this.blur();">
+      ${cat==='Income'?'<span style="font-size:11px;color:var(--text3);">wajib</span>':`<button onclick="deleteCat(${i})" style="padding:4px 8px;background:var(--red-light);color:var(--red);border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">✕</button>`}
+    </div>`).join('');
+}
+function addCategory(){
+  const name=document.getElementById('newCatName').value.trim();
+  const emoji=document.getElementById('newCatEmoji').value.trim()||'📌';
+  if(!name||CATS.includes(name)){toast('Nama sudah ada atau kosong.','error');return;}
+  CATS.push(name);CAT_EMOJI[name]=emoji;save();
+  document.getElementById('newCatName').value='';document.getElementById('newCatEmoji').value='';
+  renderCatManage();buildCatDropdown('mCat');render();toast('Kategori ditambahkan!');
+}
+function renameCat(i,newName){
+  newName=newName.trim();if(!newName||newName===CATS[i])return;
+  if(CATS.includes(newName)){toast('Nama sudah ada.','error');return;}
+  const old=CATS[i];
+  transactions.forEach(t=>{if(t.cat===old)t.cat=newName;});
+  if(budgets[old]!==undefined){budgets[newName]=budgets[old];delete budgets[old];}
+  CAT_EMOJI[newName]=CAT_EMOJI[old]||'📌';delete CAT_EMOJI[old];
+  CATS[i]=newName;save();buildCatDropdown('mCat');render();toast('Diubah!');
+}
+function updateEmoji(i,e){CAT_EMOJI[CATS[i]]=e||'📌';save();render();}
+function deleteCat(i){
+  const cat=CATS[i];if(cat==='Income')return;
+  if(transactions.some(t=>t.cat===cat)){
+    if(!confirm('Transaksi di kategori ini akan dipindah ke "Others". Lanjutkan?'))return;
+    transactions.forEach(t=>{if(t.cat===cat)t.cat='Others';});
+  }
+  delete budgets[cat];delete CAT_EMOJI[cat];CATS.splice(i,1);
+  save();renderCatManage();buildCatDropdown('mCat');render();toast('Kategori dihapus.');
+}
+function buildCatDropdown(id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  const cur=el.value;
+  el.innerHTML=CATS.map(c=>`<option value="${c}">${CAT_EMOJI[c]||''} ${c}</option>`).join('');
+  if(cur&&CATS.includes(cur))el.value=cur;
 }
 
-function setEditType(t) {
-  editTxType = t;
-  document.getElementById('editBtnExpense').className = 'type-btn' + (t==='expense'?' active-expense':'');
-  document.getElementById('editBtnIncome').className = 'type-btn' + (t==='income'?' active-income':'');
+// ── FILE UPLOAD ──
+function setupDrop(){
+  const zone=document.getElementById('dropZone');
+  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag');});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));
+  zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+}
+function handleFile(file){
+  if(!file||!file.type.startsWith('image/'))return;
+  const r=new FileReader();
+  r.onload=e=>{
+    curImgB64=e.target.result.split(',')[1];curImgType=file.type;
+    const p=document.getElementById('imgPreview');p.src=e.target.result;p.style.display='block';
+  };
+  r.readAsDataURL(file);
+}
+function switchTab(tab,btn){
+  document.querySelectorAll('.itab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  document.getElementById('tab-img').style.display=tab==='img'?'block':'none';
+  document.getElementById('tab-note').style.display=tab==='note'?'block':'none';
 }
 
-function saveEditTx() {
-  const desc = document.getElementById('editDesc').value.trim();
-  const amount = parseFloat(document.getElementById('editAmount').value) || 0;
-  const cat = document.getElementById('editCat').value;
-  const date = document.getElementById('editDate').value;
-  if(!desc) { toast('Enter a description.', 'error'); return; }
-  if(amount <= 0) { toast('Enter a valid amount.', 'error'); return; }
-  const idx = transactions.findIndex(t => t.id === editingTxId);
-  if(idx === -1) return;
-  transactions[idx] = { ...transactions[idx], desc, amount, cat, date, type: editTxType };
-  save();
-  closeEditModal();
-  toast('Transaction updated!');
-  render();
+// ── AI SCAN ──
+async function runAI(){
+  const apiKey=getApiKey();
+  if(!apiKey){document.getElementById('apiBanner').style.display='block';toast('Masukkan API Key terlebih dahulu.','error');return;}
+  document.getElementById('apiBanner').style.display='none';
+  const isImg=document.getElementById('tab-img').style.display!=='none';
+  const note=document.getElementById('noteInput').value.trim();
+  if(isImg&&!curImgB64){toast('Pilih foto terlebih dahulu.','error');return;}
+  if(!isImg&&!note){toast('Masukkan teks terlebih dahulu.','error');return;}
+  const btn=document.getElementById('scanBtn'),status=document.getElementById('scanStatus');
+  btn.disabled=true;status.innerHTML='<span class="spinner"></span> Menganalisis...';
+  const sys=`Kamu adalah ekstraktor data keuangan untuk aplikasi anggaran keluarga Indonesia. Ekstrak SEMUA transaksi dari gambar struk atau teks yang diberikan.
+Kembalikan HANYA array JSON yang valid. Setiap item:
+{"desc":"keterangan singkat","amount":angka_IDR,"category":"salah satu dari [Food,Transport,Transport Car,Transport Motor,Home debt,Electricity,Water,Internet,Utilities,Shopping,Child milk,Personal,Personal shopping,Gifts,Parents,Wife,Holiday,Dinner,Breakfast,Repair House,Others,Cashout,E-money,Arisan,Zumba,Qurban,Hutang,Posyandu,Income]","type":"expense atau income","date":"YYYY-MM-DD atau null"}
+Konversi: "150 ribu"=150000, "5 juta"=5000000. Kembalikan HANYA array JSON.`;
+  let messages;
+  if(isImg){messages=[{role:'user',content:[{type:'image',source:{type:'base64',media_type:curImgType,data:curImgB64}},{type:'text',text:'Ekstrak semua transaksi. Kembalikan JSON array saja.'}]}];}
+  else{messages=[{role:'user',content:note}];}
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-opus-4-6',max_tokens:1500,system:sys,messages})});
+    if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'API error');}
+    const data=await res.json();
+    const raw=data.content.map(c=>c.text||'').join('').trim();
+    let parsed;
+    try{parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());}catch(e){throw new Error('Gagal memproses respons AI.');}
+    if(!Array.isArray(parsed)||!parsed.length)throw new Error('Tidak ada transaksi ditemukan.');
+    extractedItems=parsed.map(item=>({...item,date:item.date||new Date().toISOString().slice(0,10),amount:parseFloat(item.amount)||0}));
+    renderAIResults();
+    status.textContent=`Ditemukan ${extractedItems.length} transaksi.`;
+    toast(`${extractedItems.length} transaksi ditemukan! 🎉`,'success');
+  }catch(err){toast(err.message,'error');status.textContent='';}
+  finally{btn.disabled=false;}
 }
 
-function deleteTxFromModal() {
-  if(!editingTxId) return;
-  if(!confirm('Delete this transaction?')) return;
-  transactions = transactions.filter(t => t.id !== editingTxId);
-  save();
-  closeEditModal();
-  toast('Transaction deleted.');
-  render();
+function renderAIResults(){
+  document.getElementById('aiResultItems').innerHTML=extractedItems.map((item,i)=>`
+    <div class="ai-result-item">
+      <div class="ai-result-row">
+        <span class="ai-badge ${item.type}">${item.type==='income'?'💵 Pemasukan':'💸 Pengeluaran'}</span>
+        <span style="font-size:11px;color:var(--text3);">${item.date||''}</span>
+        <button onclick="extractedItems.splice(${i},1);renderAIResults();" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text3);font-size:15px;">✕</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+        <input type="text" value="${item.desc}" onchange="extractedItems[${i}].desc=this.value" style="flex:1;min-width:120px;padding:6px 8px;font-size:13px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;background:var(--surface);color:var(--text);">
+        <input type="number" value="${item.amount}" onchange="extractedItems[${i}].amount=parseFloat(this.value)||0" style="width:110px;padding:6px 8px;font-size:13px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;background:var(--surface);color:var(--text);">
+      </div>
+    </div>`).join('');
+  document.getElementById('aiResults').style.display=extractedItems.length?'block':'none';
 }
 
-// Close modal on backdrop click
-document.getElementById('editModal').addEventListener('click', function(e) {
-  if(e.target === this) closeEditModal();
-});
+function addAllExtracted(){
+  const member=document.getElementById('aiMember').value;
+  extractedItems.forEach(item=>{
+    transactions.push({id:Date.now()+Math.random(),desc:item.desc,amount:item.amount,cat:item.category,date:item.date||new Date().toISOString().slice(0,10),type:item.type,member});
+  });
+  save();clearAI();toast(`${extractedItems.length||''} transaksi ditambahkan! ✅`,'success');render();
+  extractedItems=[];
+}
+function clearAI(){
+  extractedItems=[];document.getElementById('aiResults').style.display='none';
+  document.getElementById('scanStatus').textContent='';
+  curImgB64=null;document.getElementById('imgPreview').style.display='none';
+  document.getElementById('noteInput').value='';document.getElementById('fileInput').value='';
+}
 
+// ── TOAST ──
+function toast(msg,type='success'){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.className='toast '+type+' show';
+  setTimeout(()=>el.classList.remove('show'),2600);
+}
 </script>
 </body>
 </html>
