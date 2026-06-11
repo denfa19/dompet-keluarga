@@ -6,6 +6,7 @@
 <title>Dompet Keluarga</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -331,7 +332,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:.875rem 0;}
   <div id="page-add" class="page">
     <div class="card">
       <div class="card-title">🤖 AI Scan Struk / Nota</div>
-      <div id="apiBanner" style="display:none;background:#FEF3DC;border:1px solid #f0c060;border-radius:var(--r-sm);padding:9px 12px;font-size:12px;color:#B7770D;margin-bottom:10px;">⚠ Masukkan API Key Anthropic di Pengaturan untuk mengaktifkan AI Scan.</div>
+      <div id="apiBanner" style="display:none;background:#FEF3DC;border:1px solid #f0c060;border-radius:var(--r-sm);padding:9px 12px;font-size:12px;color:#B7770D;margin-bottom:10px;">⚠ Untuk scan foto: masukkan <b>Gemini API Key</b>. Untuk ketik teks: masukkan <b>Anthropic API Key</b>. Atur di Pengaturan.</div>
       <div class="input-tabs">
         <button class="itab active" onclick="switchTab('img',this)">📷 Foto</button>
         <button class="itab" onclick="switchTab('note',this)">📝 Ketik</button>
@@ -431,11 +432,23 @@ hr.div{border:none;border-top:1px solid var(--border);margin:.875rem 0;}
     <div class="section-header">⚙️ Pengaturan</div>
     <div class="card">
       <div class="settings-row">
-        <div><div class="settings-label">API Key Anthropic</div><div class="settings-sub">Untuk fitur AI Scan struk</div></div>
+        <div><div class="settings-label">API Key Anthropic</div><div class="settings-sub">Untuk AI Scan via teks/ketik</div></div>
       </div>
-      <input type="password" id="apiKeyInput" class="form-control" placeholder="sk-ant-..." onchange="saveApiKey(this.value)" style="margin-bottom:0;">
+      <input type="password" id="apiKeyInput" class="form-control" placeholder="sk-ant-..." onchange="saveApiKey(this.value)" style="margin-bottom:12px;">
+      <div class="settings-row">
+        <div><div class="settings-label">API Key Gemini</div><div class="settings-sub">Untuk AI Scan foto/struk</div></div>
+      </div>
+      <input type="password" id="geminiKeyInput" class="form-control" placeholder="AIza..." onchange="saveGeminiKey(this.value)" style="margin-bottom:0;">
     </div>
-  </div>
+
+    <!-- Export -->
+    <div class="section-header">📥 Ekspor data</div>
+    <div class="card">
+      <div class="settings-row">
+        <div><div class="settings-label">Download Excel</div><div class="settings-sub">Ekspor semua transaksi ke file .xlsx</div></div>
+      </div>
+      <button class="btn btn-secondary btn-block" onclick="exportExcel()" style="margin-top:8px;">⬇ Download Excel (.xlsx)</button>
+    </div>
 
 </main>
 
@@ -522,15 +535,19 @@ function save() {
   localStorage.setItem('dk_cats', JSON.stringify(CATS));
   localStorage.setItem('dk_emoji', JSON.stringify(CAT_EMOJI));
 }
-function saveApiKey(v){localStorage.setItem('dk_apikey',v);}
-function getApiKey(){return localStorage.getItem('dk_apikey')||document.getElementById('apiKeyInput').value;}
+function saveApiKey(v){localStorage.setItem('dkApiKey',v.trim());toast('API Key Anthropic disimpan!','success');}
+function getApiKey(){return localStorage.getItem('dkApiKey')||'';}
+function saveGeminiKey(v){localStorage.setItem('dkGeminiKey',v.trim());toast('API Key Gemini disimpan!','success');}
+function getGeminiKey(){return localStorage.getItem('dkGeminiKey')||'';}
 function fmt(n){return'Rp'+Math.round(n).toLocaleString('id-ID');}
 function fmtS(n){if(n>=1e9)return'Rp'+(n/1e9).toFixed(1)+'M';if(n>=1e6)return'Rp'+(n/1e6).toFixed(1)+'jt';if(n>=1e3)return'Rp'+(n/1e3).toFixed(0)+'rb';return fmt(n);}
 
 // ── INIT ──
 window.addEventListener('load', () => {
-  const k = localStorage.getItem('dk_apikey');
-  if(k) document.getElementById('apiKeyInput').value = k;
+  const k = localStorage.getItem('dkApiKey')||localStorage.getItem('dk_apikey')||'';
+  if(k){document.getElementById('apiKeyInput').value=k;localStorage.setItem('dkApiKey',k);}
+  const gk = localStorage.getItem('dkGeminiKey')||'';
+  if(gk) document.getElementById('geminiKeyInput').value = gk;
   document.getElementById('mDate').value = new Date().toISOString().slice(0,10);
 
   // Version-based data refresh
@@ -939,38 +956,116 @@ function switchTab(tab,btn){
   document.getElementById('tab-note').style.display=tab==='note'?'block':'none';
 }
 
+// ── EXPORT EXCEL ──
+function exportExcel(){
+  if(!transactions.length){toast('Belum ada transaksi.','error');return;}
+  const MONTHS_ID=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  // Sheet 1: all transactions
+  const txData = [['Tanggal','Keterangan','Kategori','Tipe','Member','Jumlah (Rp)']];
+  [...transactions].sort((a,b)=>a.date.localeCompare(b.date)).forEach(t=>{
+    txData.push([t.date, t.desc||'', t.cat||'', t.type==='income'?'Pemasukan':'Pengeluaran', (t.member||'ayah')==='ayah'?'Ayah':'Ibu', t.amount]);
+  });
+
+  // Sheet 2: monthly summary
+  const byMonth={};
+  transactions.forEach(t=>{
+    const key=t.date.slice(0,7);
+    if(!byMonth[key])byMonth[key]={income:0,expense:0};
+    if(t.type==='income')byMonth[key].income+=t.amount;
+    else byMonth[key].expense+=t.amount;
+  });
+  const sumData=[['Bulan','Pemasukan (Rp)','Pengeluaran (Rp)','Saldo (Rp)']];
+  Object.keys(byMonth).sort().forEach(k=>{
+    const {income,expense}=byMonth[k];
+    const [y,m]=k.split('-');
+    sumData.push([MONTHS_ID[parseInt(m)-1]+' '+y, income, expense, income-expense]);
+  });
+
+  // Sheet 3: by category
+  const byCat={};
+  transactions.filter(t=>t.type==='expense').forEach(t=>{byCat[t.cat]=(byCat[t.cat]||0)+t.amount;});
+  const catData=[['Kategori','Total Pengeluaran (Rp)','Anggaran (Rp)','Sisa (Rp)']];
+  Object.keys(byCat).sort().forEach(c=>{
+    const budget=budgets[c]||0;
+    catData.push([c, byCat[c], budget||'', budget?(budget-byCat[c]):'']);
+  });
+
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(txData), 'Transaksi');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sumData), 'Ringkasan Bulanan');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(catData), 'Per Kategori');
+
+  const now=new Date();
+  const fname=`DompetKeluarga_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.xlsx`;
+  XLSX.writeFile(wb, fname);
+  toast('File Excel berhasil didownload! 📊','success');
+}
+
 // ── AI SCAN ──
 async function runAI(){
-  const apiKey=getApiKey();
-  if(!apiKey){document.getElementById('apiBanner').style.display='block';toast('Masukkan API Key terlebih dahulu.','error');return;}
-  document.getElementById('apiBanner').style.display='none';
   const isImg=document.getElementById('tab-img').style.display!=='none';
   const note=document.getElementById('noteInput').value.trim();
   if(isImg&&!curImgB64){toast('Pilih foto terlebih dahulu.','error');return;}
   if(!isImg&&!note){toast('Masukkan teks terlebih dahulu.','error');return;}
+
   const btn=document.getElementById('scanBtn'),status=document.getElementById('scanStatus');
-  btn.disabled=true;status.innerHTML='<span class="spinner"></span> Menganalisis...';
-  const sys=`Kamu adalah ekstraktor data keuangan untuk aplikasi anggaran keluarga Indonesia. Ekstrak SEMUA transaksi dari gambar struk atau teks yang diberikan.
+
+  if(isImg){
+    // Use Gemini for image scanning
+    const geminiKey=getGeminiKey();
+    if(!geminiKey){document.getElementById('apiBanner').style.display='block';toast('Masukkan Gemini API Key di Pengaturan.','error');return;}
+    document.getElementById('apiBanner').style.display='none';
+    btn.disabled=true;status.innerHTML='<span class="spinner"></span> Menganalisis foto...';
+    const prompt=`Kamu adalah ekstraktor data keuangan untuk aplikasi anggaran keluarga Indonesia. Ekstrak SEMUA transaksi dari gambar struk atau nota ini.
+Kembalikan HANYA array JSON yang valid. Setiap item:
+{"desc":"keterangan singkat","amount":angka_IDR,"category":"salah satu dari [Food,Transport,Transport Car,Transport Motor,Home debt,Electricity,Water,Internet,Utilities,Shopping,Child milk,Personal,Personal shopping,Gifts,Parents,Wife,Holiday,Dinner,Breakfast,Repair House,Others,Cashout,E-money,Arisan,Zumba,Qurban,Hutang,Posyandu,Income]","type":"expense atau income","date":"YYYY-MM-DD atau null"}
+Konversi: "150 ribu"=150000, "5 juta"=5000000. Kembalikan HANYA array JSON tanpa markdown.`;
+    try{
+      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({contents:[{parts:[
+          {inline_data:{mime_type:curImgType,data:curImgB64}},
+          {text:prompt}
+        ]}]})
+      });
+      if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'Gemini API error');}
+      const data=await res.json();
+      const raw=(data.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();
+      let parsed;
+      try{parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());}catch(e){throw new Error('Gagal memproses respons Gemini.');}
+      if(!Array.isArray(parsed)||!parsed.length)throw new Error('Tidak ada transaksi ditemukan.');
+      extractedItems=parsed.map(item=>({...item,date:item.date||new Date().toISOString().slice(0,10),amount:parseFloat(item.amount)||0}));
+      renderAIResults();
+      status.textContent=`Ditemukan ${extractedItems.length} transaksi.`;
+      toast(`${extractedItems.length} transaksi ditemukan! 🎉`,'success');
+    }catch(err){toast(err.message,'error');status.textContent='';}
+    finally{btn.disabled=false;}
+  } else {
+    // Use Anthropic for text input
+    const apiKey=getApiKey();
+    if(!apiKey){document.getElementById('apiBanner').style.display='block';toast('Masukkan Anthropic API Key di Pengaturan.','error');return;}
+    document.getElementById('apiBanner').style.display='none';
+    btn.disabled=true;status.innerHTML='<span class="spinner"></span> Menganalisis teks...';
+    const sys=`Kamu adalah ekstraktor data keuangan untuk aplikasi anggaran keluarga Indonesia. Ekstrak SEMUA transaksi dari teks yang diberikan.
 Kembalikan HANYA array JSON yang valid. Setiap item:
 {"desc":"keterangan singkat","amount":angka_IDR,"category":"salah satu dari [Food,Transport,Transport Car,Transport Motor,Home debt,Electricity,Water,Internet,Utilities,Shopping,Child milk,Personal,Personal shopping,Gifts,Parents,Wife,Holiday,Dinner,Breakfast,Repair House,Others,Cashout,E-money,Arisan,Zumba,Qurban,Hutang,Posyandu,Income]","type":"expense atau income","date":"YYYY-MM-DD atau null"}
 Konversi: "150 ribu"=150000, "5 juta"=5000000. Kembalikan HANYA array JSON.`;
-  let messages;
-  if(isImg){messages=[{role:'user',content:[{type:'image',source:{type:'base64',media_type:curImgType,data:curImgB64}},{type:'text',text:'Ekstrak semua transaksi. Kembalikan JSON array saja.'}]}];}
-  else{messages=[{role:'user',content:note}];}
-  try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-opus-4-6',max_tokens:1500,system:sys,messages})});
-    if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'API error');}
-    const data=await res.json();
-    const raw=data.content.map(c=>c.text||'').join('').trim();
-    let parsed;
-    try{parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());}catch(e){throw new Error('Gagal memproses respons AI.');}
-    if(!Array.isArray(parsed)||!parsed.length)throw new Error('Tidak ada transaksi ditemukan.');
-    extractedItems=parsed.map(item=>({...item,date:item.date||new Date().toISOString().slice(0,10),amount:parseFloat(item.amount)||0}));
-    renderAIResults();
-    status.textContent=`Ditemukan ${extractedItems.length} transaksi.`;
-    toast(`${extractedItems.length} transaksi ditemukan! 🎉`,'success');
-  }catch(err){toast(err.message,'error');status.textContent='';}
-  finally{btn.disabled=false;}
+    try{
+      const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-opus-4-6',max_tokens:1500,system:sys,messages:[{role:'user',content:note}]})});
+      if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'API error');}
+      const data=await res.json();
+      const raw=data.content.map(c=>c.text||'').join('').trim();
+      let parsed;
+      try{parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());}catch(e){throw new Error('Gagal memproses respons AI.');}
+      if(!Array.isArray(parsed)||!parsed.length)throw new Error('Tidak ada transaksi ditemukan.');
+      extractedItems=parsed.map(item=>({...item,date:item.date||new Date().toISOString().slice(0,10),amount:parseFloat(item.amount)||0}));
+      renderAIResults();
+      status.textContent=`Ditemukan ${extractedItems.length} transaksi.`;
+      toast(`${extractedItems.length} transaksi ditemukan! 🎉`,'success');
+    }catch(err){toast(err.message,'error');status.textContent='';}
+    finally{btn.disabled=false;}
+  }
 }
 
 function renderAIResults(){
