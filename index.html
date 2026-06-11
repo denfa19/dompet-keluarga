@@ -444,10 +444,24 @@ hr.div{border:none;border-top:1px solid var(--border);margin:.875rem 0;}
     <!-- Export -->
     <div class="section-header">📥 Ekspor data</div>
     <div class="card">
-      <div class="settings-row">
-        <div><div class="settings-label">Download Excel</div><div class="settings-sub">Ekspor semua transaksi ke file .xlsx</div></div>
+      <div class="settings-label" style="margin-bottom:8px;">Download Excel</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <div>
+          <label class="form-label">Dari tanggal</label>
+          <input type="date" id="xlsDateFrom" class="form-control" style="font-size:13px;padding:7px 10px;">
+        </div>
+        <div>
+          <label class="form-label">Sampai tanggal</label>
+          <input type="date" id="xlsDateTo" class="form-control" style="font-size:13px;padding:7px 10px;">
+        </div>
       </div>
-      <button class="btn btn-secondary btn-block" onclick="exportExcel()" style="margin-top:8px;">⬇ Download Excel (.xlsx)</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="setXlsRange('month')" style="flex:1;">Bulan ini</button>
+        <button class="btn btn-secondary btn-sm" onclick="setXlsRange('3month')" style="flex:1;">3 Bulan</button>
+        <button class="btn btn-secondary btn-sm" onclick="setXlsRange('year')" style="flex:1;">Tahun ini</button>
+        <button class="btn btn-secondary btn-sm" onclick="setXlsRange('all')" style="flex:1;">Semua</button>
+      </div>
+      <button class="btn btn-primary btn-block" onclick="exportExcel()" style="margin-top:10px;">⬇ Download Excel (.xlsx)</button>
     </div>
 
 </main>
@@ -549,6 +563,10 @@ window.addEventListener('load', () => {
   const gk = localStorage.getItem('dkGeminiKey')||'';
   if(gk) document.getElementById('geminiKeyInput').value = gk;
   document.getElementById('mDate').value = new Date().toISOString().slice(0,10);
+  // Set default Excel export range to current month
+  const _now=new Date();
+  document.getElementById('xlsDateFrom').value=new Date(_now.getFullYear(),_now.getMonth(),1).toISOString().slice(0,10);
+  document.getElementById('xlsDateTo').value=new Date(_now.getFullYear(),_now.getMonth()+1,0).toISOString().slice(0,10);
 
   // Version-based data refresh
   const DATA_VERSION = 'v3';
@@ -957,18 +975,51 @@ function switchTab(tab,btn){
 }
 
 // ── EXPORT EXCEL ──
+function setXlsRange(mode){
+  const now=new Date();
+  let from,to;
+  if(mode==='month'){
+    from=new Date(now.getFullYear(),now.getMonth(),1);
+    to=new Date(now.getFullYear(),now.getMonth()+1,0);
+  } else if(mode==='3month'){
+    from=new Date(now.getFullYear(),now.getMonth()-2,1);
+    to=new Date(now.getFullYear(),now.getMonth()+1,0);
+  } else if(mode==='year'){
+    from=new Date(now.getFullYear(),0,1);
+    to=new Date(now.getFullYear(),11,31);
+  } else {
+    document.getElementById('xlsDateFrom').value='';
+    document.getElementById('xlsDateTo').value='';
+    return;
+  }
+  document.getElementById('xlsDateFrom').value=from.toISOString().slice(0,10);
+  document.getElementById('xlsDateTo').value=to.toISOString().slice(0,10);
+  toast('Rentang tanggal diatur!');
+}
+
 function exportExcel(){
   if(!transactions.length){toast('Belum ada transaksi.','error');return;}
   const MONTHS_ID=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-  // Sheet 1: all transactions
-  const txData = [['Tanggal','Keterangan','Kategori','Tipe','Member','Jumlah (Rp)']];
-  [...transactions].sort((a,b)=>a.date.localeCompare(b.date)).forEach(t=>{
+
+  const fromVal=document.getElementById('xlsDateFrom').value;
+  const toVal=document.getElementById('xlsDateTo').value;
+  let filtered=[...transactions];
+  if(fromVal) filtered=filtered.filter(t=>t.date>=fromVal);
+  if(toVal)   filtered=filtered.filter(t=>t.date<=toVal);
+  if(!filtered.length){toast('Tidak ada transaksi di rentang ini.','error');return;}
+  filtered.sort((a,b)=>a.date.localeCompare(b.date));
+
+  const rangeLabel = (fromVal||toVal) ? `_${fromVal||'awal'}_sd_${toVal||'akhir'}` : '_Semua';
+
+  // Sheet 1: transactions
+  const txData=[['Tanggal','Keterangan','Kategori','Tipe','Member','Jumlah (Rp)']];
+  filtered.forEach(t=>{
     txData.push([t.date, t.desc||'', t.cat||'', t.type==='income'?'Pemasukan':'Pengeluaran', (t.member||'ayah')==='ayah'?'Ayah':'Ibu', t.amount]);
   });
 
-  // Sheet 2: monthly summary
+  // Sheet 2: monthly summary (of filtered range)
   const byMonth={};
-  transactions.forEach(t=>{
+  filtered.forEach(t=>{
     const key=t.date.slice(0,7);
     if(!byMonth[key])byMonth[key]={income:0,expense:0};
     if(t.type==='income')byMonth[key].income+=t.amount;
@@ -981,9 +1032,9 @@ function exportExcel(){
     sumData.push([MONTHS_ID[parseInt(m)-1]+' '+y, income, expense, income-expense]);
   });
 
-  // Sheet 3: by category
+  // Sheet 3: by category (of filtered range)
   const byCat={};
-  transactions.filter(t=>t.type==='expense').forEach(t=>{byCat[t.cat]=(byCat[t.cat]||0)+t.amount;});
+  filtered.filter(t=>t.type==='expense').forEach(t=>{byCat[t.cat]=(byCat[t.cat]||0)+t.amount;});
   const catData=[['Kategori','Total Pengeluaran (Rp)','Anggaran (Rp)','Sisa (Rp)']];
   Object.keys(byCat).sort().forEach(c=>{
     const budget=budgets[c]||0;
@@ -995,10 +1046,9 @@ function exportExcel(){
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sumData), 'Ringkasan Bulanan');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(catData), 'Per Kategori');
 
-  const now=new Date();
-  const fname=`DompetKeluarga_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.xlsx`;
+  const fname=`DompetKeluarga${rangeLabel}.xlsx`;
   XLSX.writeFile(wb, fname);
-  toast('File Excel berhasil didownload! 📊','success');
+  toast(`✅ ${filtered.length} transaksi diexport!`,'success');
 }
 
 // ── AI SCAN ──
@@ -1021,15 +1071,26 @@ Kembalikan HANYA array JSON yang valid. Setiap item:
 {"desc":"keterangan singkat","amount":angka_IDR,"category":"salah satu dari [Food,Transport,Transport Car,Transport Motor,Home debt,Electricity,Water,Internet,Utilities,Shopping,Child milk,Personal,Personal shopping,Gifts,Parents,Wife,Holiday,Dinner,Breakfast,Repair House,Others,Cashout,E-money,Arisan,Zumba,Qurban,Hutang,Posyandu,Income]","type":"expense atau income","date":"YYYY-MM-DD atau null"}
 Konversi: "150 ribu"=150000, "5 juta"=5000000. Kembalikan HANYA array JSON tanpa markdown.`;
     try{
-      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({contents:[{parts:[
-          {inline_data:{mime_type:curImgType,data:curImgB64}},
-          {text:prompt}
-        ]}]})
-      });
-      if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'Gemini API error');}
+      // Try gemini-1.5-flash first, fallback to gemini-1.5-flash-latest
+      const GEMINI_MODELS=['gemini-1.5-flash','gemini-1.5-flash-latest','gemini-1.0-pro-vision-latest'];
+      let res, lastErr;
+      for(const model of GEMINI_MODELS){
+        try{
+          res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({contents:[{parts:[
+              {inline_data:{mime_type:curImgType,data:curImgB64}},
+              {text:prompt}
+            ]}]})
+          });
+          if(res.ok) break;
+          const e=await res.json();
+          lastErr=e.error?.message||'Gemini API error';
+          res=null;
+        }catch(e){lastErr=e.message;res=null;}
+      }
+      if(!res){throw new Error(lastErr||'Semua model Gemini gagal.');}
       const data=await res.json();
       const raw=(data.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();
       let parsed;
