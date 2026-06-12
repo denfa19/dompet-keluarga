@@ -262,7 +262,10 @@ hr.div{border:none;border-top:1px solid var(--border);margin:.875rem 0;}
   <div class="brand">Dompet<span>Keluarga</span></div>
   <div class="month-nav">
     <button onclick="changeMonth(-1)">&#8249;</button>
-    <div class="mlabel" id="monthLabel"></div>
+    <div style="text-align:center;">
+      <div class="mlabel" id="monthLabel"></div>
+      <div id="periodSub" style="font-size:10px;color:var(--text3);font-weight:500;margin-top:1px;"></div>
+    </div>
     <button onclick="changeMonth(1)">&#8250;</button>
   </div>
 </header>
@@ -431,6 +434,14 @@ hr.div{border:none;border-top:1px solid var(--border);margin:.875rem 0;}
     <!-- Settings -->
     <div class="section-header">⚙️ Pengaturan</div>
     <div class="card">
+      <div class="settings-row" style="margin-bottom:8px;">
+        <div><div class="settings-label">Siklus Anggaran</div><div class="settings-sub">Gaji masuk tiap tanggal berapa?</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <span style="font-size:13px;color:var(--text2);">Tanggal mulai siklus:</span>
+        <input type="number" id="cycleDayInput" class="form-control" min="1" max="28" value="25" onchange="saveCycleDay(this.value)" style="width:70px;text-align:center;font-weight:600;font-size:15px;">
+        <span style="font-size:12px;color:var(--text3);" id="cyclePreview"></span>
+      </div>
       <div class="settings-row">
         <div><div class="settings-label">API Key Anthropic</div><div class="settings-sub">Untuk AI Scan via teks/ketik</div></div>
       </div>
@@ -441,6 +452,40 @@ hr.div{border:none;border-top:1px solid var(--border);margin:.875rem 0;}
       <input type="password" id="geminiKeyInput" class="form-control" placeholder="AIza..." onchange="saveGeminiKey(this.value)" style="margin-bottom:8px;">
       <button class="btn btn-secondary btn-sm" onclick="checkGeminiModels()" id="checkModelBtn" style="width:100%;">🔍 Cek model yang tersedia</button>
       <div id="geminiModelStatus" style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.6;"></div>
+
+      <!-- Google Sheets Sync -->
+      <hr class="div">
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">🟢 Sinkron Google Sheets</div>
+          <div class="settings-sub">Transaksi otomatis terkirim ke spreadsheet Anda</div>
+        </div>
+        <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;">
+          <input type="checkbox" id="sheetsToggle" onchange="toggleSheetsSync(this.checked)" style="opacity:0;width:0;height:0;">
+          <span id="sheetsToggleSlider" style="position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:24px;transition:.3s;">
+            <span style="position:absolute;content:'';height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s;display:block;" id="sheetsToggleKnob"></span>
+          </span>
+        </label>
+      </div>
+      <div id="sheetsSyncPanel" style="display:none;margin-top:8px;">
+        <div style="background:var(--blue-light);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--blue);line-height:1.6;">
+          <b>Cara setup (sekali saja):</b><br>
+          1. Buka <a href="https://script.google.com" target="_blank" style="color:var(--blue);font-weight:700;">script.google.com</a> → New Project<br>
+          2. Tempel kode dari tombol di bawah → Save<br>
+          3. Deploy → New deployment → Web app → Anyone → Deploy<br>
+          4. Copy URL deployment, tempel di sini
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="copyAppsScript()" style="width:100%;margin-bottom:8px;">📋 Copy kode Apps Script</button>
+        <label class="form-label">URL Web App (Apps Script)</label>
+        <input type="text" id="sheetsWebAppUrl" class="form-control" placeholder="https://script.google.com/macros/s/.../exec" onchange="saveSheetsUrl(this.value)" style="margin-bottom:8px;font-size:13px;">
+        <label class="form-label">Nama Sheet (opsional)</label>
+        <input type="text" id="sheetsName" class="form-control" placeholder="DompetKeluarga" onchange="saveSheetsName(this.value)" style="margin-bottom:10px;font-size:13px;">
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="testSheetsSync()">🔗 Test koneksi</button>
+          <button class="btn btn-primary btn-sm" style="flex:1;" onclick="syncAllToSheets()">⬆ Sync semua data</button>
+        </div>
+        <div id="sheetsSyncStatus" style="font-size:12px;color:var(--text3);margin-top:6px;min-height:18px;"></div>
+      </div>
     </div>
 
     <!-- Export -->
@@ -543,6 +588,45 @@ let editingId = null, editTxType = 'expense', editMemberVal = 'ayah';
 let pieInst = null, barInst = null;
 let extractedItems = [], curImgB64 = null, curImgType = null;
 let filterCat = '';
+let cycleDay = parseInt(localStorage.getItem('dk_cycleDay')||'25');
+
+// ── CYCLE HELPERS ──
+// "curMonth/curYear" = the label month (e.g. Juni 2026)
+// Actual date range: cycleDay of prev month → (cycleDay-1) of label month
+function getPeriodRange(y, m) {
+  // start: cycleDay of previous month
+  let sy = y, sm = m - 1;
+  if(sm < 0){ sm = 11; sy--; }
+  const start = new Date(sy, sm, cycleDay);
+  // end: (cycleDay - 1) of label month, end of day
+  const end = new Date(y, m, cycleDay - 1);
+  end.setHours(23,59,59,999);
+  return { start, end };
+}
+
+function inPeriod(dateStr, y, m) {
+  const d = new Date(dateStr);
+  const { start, end } = getPeriodRange(y, m);
+  return d >= start && d <= end;
+}
+
+function saveCycleDay(v) {
+  const n = Math.max(1, Math.min(28, parseInt(v)||25));
+  cycleDay = n;
+  localStorage.setItem('dk_cycleDay', n);
+  document.getElementById('cycleDayInput').value = n;
+  updateCyclePreview();
+  render();
+  toast('Siklus anggaran diperbarui!','success');
+}
+
+function updateCyclePreview() {
+  const el = document.getElementById('cyclePreview');
+  if(!el) return;
+  const { start, end } = getPeriodRange(curYear, curMonth);
+  const fmt2 = d => d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear();
+  el.textContent = fmt2(start)+' – '+fmt2(end);
+}
 
 function save() {
   localStorage.setItem('dk_tx', JSON.stringify(transactions));
@@ -564,11 +648,29 @@ window.addEventListener('load', () => {
   if(k){document.getElementById('apiKeyInput').value=k;localStorage.setItem('dkApiKey',k);}
   const gk = localStorage.getItem('dkGeminiKey')||'';
   if(gk) document.getElementById('geminiKeyInput').value = gk;
-  document.getElementById('mDate').value = new Date().toISOString().slice(0,10);
-  // Set default Excel export range to current month
-  const _now=new Date();
-  document.getElementById('xlsDateFrom').value=new Date(_now.getFullYear(),_now.getMonth(),1).toISOString().slice(0,10);
-  document.getElementById('xlsDateTo').value=new Date(_now.getFullYear(),_now.getMonth()+1,0).toISOString().slice(0,10);
+
+  // Load cycle day setting
+  cycleDay = parseInt(localStorage.getItem('dk_cycleDay')||'25');
+  document.getElementById('cycleDayInput').value = cycleDay;
+
+  // Set curMonth/curYear based on today vs cycleDay
+  // If today >= cycleDay → we're in the NEXT month's period
+  // e.g. today = 26 May, cycleDay=25 → period label = Juni
+  const today = new Date();
+  if(today.getDate() >= cycleDay) {
+    // Advance to next month's label
+    let m = today.getMonth() + 1, y = today.getFullYear();
+    if(m > 11){ m = 0; y++; }
+    curMonth = m; curYear = y;
+  } else {
+    curMonth = today.getMonth(); curYear = today.getFullYear();
+  }
+
+  document.getElementById('mDate').value = today.toISOString().slice(0,10);
+  // Set default Excel export range to current period
+  const { start, end } = getPeriodRange(curYear, curMonth);
+  document.getElementById('xlsDateFrom').value = start.toISOString().slice(0,10);
+  document.getElementById('xlsDateTo').value = end.toISOString().slice(0,10);
 
   // Version-based data refresh
   const DATA_VERSION = 'v3';
@@ -585,6 +687,7 @@ window.addEventListener('load', () => {
   if(toAdd.length > 0){ transactions = [...transactions, ...toAdd]; save(); }
 
   buildCatDropdown('mCat');
+  updateSheetsSyncUI();
   render();
   setupDrop();
 });
@@ -617,9 +720,7 @@ function changeMonth(d) {
 // ── FILTER ──
 function getMonthTx() {
   return transactions.filter(t => {
-    const d = new Date(t.date);
-    const inMonth = d.getFullYear()===curYear && d.getMonth()===curMonth;
-    if(!inMonth) return false;
+    if(!inPeriod(t.date, curYear, curMonth)) return false;
     if(curMember==='family') return true;
     return (t.member||'ayah') === curMember;
   });
@@ -628,6 +729,14 @@ function getMonthTx() {
 // ── RENDER ──
 function render() {
   document.getElementById('monthLabel').textContent = MONTHS[curMonth]+' '+curYear;
+  updateCyclePreview();
+  // Show period subtitle in header if exists
+  const subEl = document.getElementById('periodSub');
+  if(subEl) {
+    const { start, end } = getPeriodRange(curYear, curMonth);
+    const fmt2 = d => d.getDate()+'/'+(d.getMonth()+1);
+    subEl.textContent = fmt2(start)+' – '+fmt2(end)+'/'+curYear;
+  }
   const mtx = getMonthTx();
   const income = mtx.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
   const expense = mtx.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
@@ -721,16 +830,14 @@ function renderCharts(mtx) {
     document.getElementById('pieLegend').innerHTML='';
   }
 
-  // Bar
+  // Bar - last 6 periods
   const bLabels=[],bInc=[],bExp=[];
   for(let i=5;i>=0;i--){
     let m=curMonth-i,y=curYear;
     if(m<0){m+=12;y--;}
     bLabels.push(MONTHS[m].slice(0,3));
     const mx=transactions.filter(t=>{
-      const d=new Date(t.date);
-      const inM=d.getFullYear()===y&&d.getMonth()===m;
-      if(!inM) return false;
+      if(!inPeriod(t.date, y, m)) return false;
       if(curMember==='family') return true;
       return (t.member||'ayah')===curMember;
     });
@@ -835,8 +942,10 @@ function addManual() {
   const date=document.getElementById('mDate').value||new Date().toISOString().slice(0,10);
   if(!desc){toast('Masukkan keterangan.','error');return;}
   if(amount<=0){toast('Masukkan jumlah yang valid.','error');return;}
-  transactions.push({id:Date.now(),desc,amount,cat,date,type:txType,member:addMember});
+  const newTx={id:Date.now(),desc,amount,cat,date,type:txType,member:addMember};
+  transactions.push(newTx);
   save();
+  sendToSheets('addRow',{transaction:newTx});
   document.getElementById('mDesc').value='';
   document.getElementById('mAmount').value='';
   toast('Transaksi ditambahkan! ✅','success');
@@ -978,24 +1087,25 @@ function switchTab(tab,btn){
 
 // ── EXPORT EXCEL ──
 function setXlsRange(mode){
-  const now=new Date();
-  let from,to;
+  let fromDate, toDate;
   if(mode==='month'){
-    from=new Date(now.getFullYear(),now.getMonth(),1);
-    to=new Date(now.getFullYear(),now.getMonth()+1,0);
+    const {start,end}=getPeriodRange(curYear,curMonth);
+    fromDate=start;toDate=end;
   } else if(mode==='3month'){
-    from=new Date(now.getFullYear(),now.getMonth()-2,1);
-    to=new Date(now.getFullYear(),now.getMonth()+1,0);
+    let m=curMonth-2,y=curYear;if(m<0){m+=12;y--;}
+    fromDate=getPeriodRange(y,m).start;
+    toDate=getPeriodRange(curYear,curMonth).end;
   } else if(mode==='year'){
-    from=new Date(now.getFullYear(),0,1);
-    to=new Date(now.getFullYear(),11,31);
+    // current year: Jan period start to Dec period end
+    fromDate=getPeriodRange(curYear,1).start;
+    toDate=getPeriodRange(curYear,12).end;
   } else {
     document.getElementById('xlsDateFrom').value='';
     document.getElementById('xlsDateTo').value='';
     return;
   }
-  document.getElementById('xlsDateFrom').value=from.toISOString().slice(0,10);
-  document.getElementById('xlsDateTo').value=to.toISOString().slice(0,10);
+  document.getElementById('xlsDateFrom').value=fromDate.toISOString().slice(0,10);
+  document.getElementById('xlsDateTo').value=toDate.toISOString().slice(0,10);
   toast('Rentang tanggal diatur!');
 }
 
@@ -1207,7 +1317,9 @@ function renderAIResults(){
 function addAllExtracted(){
   const member=document.getElementById('aiMember').value;
   extractedItems.forEach(item=>{
-    transactions.push({id:Date.now()+Math.random(),desc:item.desc,amount:item.amount,cat:item.category,date:item.date||new Date().toISOString().slice(0,10),type:item.type,member});
+    const newTx={id:Date.now()+Math.random(),desc:item.desc,amount:item.amount,cat:item.category,date:item.date||new Date().toISOString().slice(0,10),type:item.type,member};
+    transactions.push(newTx);
+    sendToSheets('addRow',{transaction:newTx});
   });
   save();clearAI();toast(`${extractedItems.length||''} transaksi ditambahkan! ✅`,'success');render();
   extractedItems=[];
@@ -1217,6 +1329,140 @@ function clearAI(){
   document.getElementById('scanStatus').textContent='';
   curImgB64=null;document.getElementById('imgPreview').style.display='none';
   document.getElementById('noteInput').value='';document.getElementById('fileInput').value='';
+}
+
+// ── GOOGLE SHEETS SYNC ──
+const APPS_SCRIPT_CODE = `// DompetKeluarga — Google Sheets Sync
+// Paste this in Google Apps Script → Deploy as Web App (Anyone can access)
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const action = data.action;
+    const sheetName = data.sheetName || 'DompetKeluarga';
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
+      sheet.appendRow(['ID','Tanggal','Keterangan','Kategori','Tipe','Member','Jumlah (Rp)','Dicatat']);
+      sheet.setFrozenRows(1);
+      sheet.getRange(1,1,1,8).setFontWeight('bold').setBackground('#1D8A5E').setFontColor('#ffffff');
+    }
+
+    if (action === 'addRow') {
+      const t = data.transaction;
+      sheet.appendRow([
+        t.id, t.date, t.desc || '', t.cat || '',
+        t.type === 'income' ? 'Pemasukan' : 'Pengeluaran',
+        (t.member || 'ayah') === 'ayah' ? 'Ayah' : 'Ibu',
+        t.amount,
+        new Date().toLocaleString('id-ID')
+      ]);
+    } else if (action === 'syncAll') {
+      const txList = data.transactions;
+      // Clear existing data rows (keep header)
+      const lastRow = sheet.getLastRow();
+      if (lastRow > 1) sheet.deleteRows(2, lastRow - 1);
+      // Write all transactions sorted by date
+      txList.sort((a,b) => a.date.localeCompare(b.date));
+      const rows = txList.map(t => [
+        t.id, t.date, t.desc || '', t.cat || '',
+        t.type === 'income' ? 'Pemasukan' : 'Pengeluaran',
+        (t.member || 'ayah') === 'ayah' ? 'Ayah' : 'Ibu',
+        t.amount,
+        new Date().toLocaleString('id-ID')
+      ]);
+      if (rows.length > 0) sheet.getRange(2, 1, rows.length, 8).setValues(rows);
+    } else if (action === 'ping') {
+      return ContentService.createTextOutput(JSON.stringify({ok:true,msg:'Koneksi berhasil!'}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ok:true}))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ok:false,error:err.message}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+function doGet(e) { return doPost(e); }
+`;
+
+function getSheetsEnabled(){return localStorage.getItem('dk_sheetsEnabled')==='1';}
+function getSheetsUrl(){return localStorage.getItem('dk_sheetsUrl')||'';}
+function getSheetsName(){return localStorage.getItem('dk_sheetsName')||'DompetKeluarga';}
+
+function saveSheetsUrl(v){localStorage.setItem('dk_sheetsUrl',v.trim());toast('URL disimpan!','success');}
+function saveSheetsName(v){localStorage.setItem('dk_sheetsName',v.trim()||'DompetKeluarga');}
+
+function toggleSheetsSync(enabled){
+  localStorage.setItem('dk_sheetsEnabled', enabled?'1':'0');
+  updateSheetsSyncUI();
+  toast(enabled?'Sinkron Google Sheets aktif! 🟢':'Sinkron dinonaktifkan.', enabled?'success':'');
+}
+
+function updateSheetsSyncUI(){
+  const enabled=getSheetsEnabled();
+  const cb=document.getElementById('sheetsToggle');
+  const slider=document.getElementById('sheetsToggleSlider');
+  const knob=document.getElementById('sheetsToggleKnob');
+  const panel=document.getElementById('sheetsSyncPanel');
+  if(cb)cb.checked=enabled;
+  if(slider)slider.style.background=enabled?'var(--green)':'var(--border)';
+  if(knob)knob.style.transform=enabled?'translateX(20px)':'translateX(0)';
+  if(panel)panel.style.display=enabled?'block':'none';
+  const urlEl=document.getElementById('sheetsWebAppUrl');
+  const nameEl=document.getElementById('sheetsName');
+  if(urlEl)urlEl.value=getSheetsUrl();
+  if(nameEl)nameEl.value=getSheetsName();
+}
+
+function copyAppsScript(){
+  navigator.clipboard.writeText(APPS_SCRIPT_CODE).then(()=>{
+    toast('Kode Apps Script disalin! 📋','success');
+  }).catch(()=>{
+    // Fallback
+    const ta=document.createElement('textarea');
+    ta.value=APPS_SCRIPT_CODE;document.body.appendChild(ta);
+    ta.select();document.execCommand('copy');document.body.removeChild(ta);
+    toast('Kode Apps Script disalin! 📋','success');
+  });
+}
+
+async function sendToSheets(action, payload){
+  const url=getSheetsUrl();
+  if(!url||!getSheetsEnabled())return;
+  try{
+    const body={action, sheetName:getSheetsName(), ...payload};
+    await fetch(url,{method:'POST',body:JSON.stringify(body),headers:{'Content-Type':'text/plain'}});
+  }catch(e){/* silent fail */}
+}
+
+async function testSheetsSync(){
+  const url=getSheetsUrl();
+  const statusEl=document.getElementById('sheetsSyncStatus');
+  if(!url){toast('Masukkan URL Web App terlebih dahulu.','error');return;}
+  statusEl.innerHTML='<span class="spinner"></span> Mengecek koneksi...';
+  try{
+    const r=await fetch(url,{method:'POST',body:JSON.stringify({action:'ping',sheetName:getSheetsName()}),headers:{'Content-Type':'text/plain'}});
+    const d=await r.json();
+    if(d.ok){statusEl.textContent='✅ '+d.msg;toast('Koneksi berhasil! ✅','success');}
+    else{statusEl.textContent='❌ '+d.error;toast('Gagal: '+d.error,'error');}
+  }catch(e){statusEl.textContent='❌ Gagal terhubung. Pastikan URL dan deployment benar.';toast('Gagal terhubung.','error');}
+}
+
+async function syncAllToSheets(){
+  const url=getSheetsUrl();
+  const statusEl=document.getElementById('sheetsSyncStatus');
+  if(!url){toast('Masukkan URL Web App terlebih dahulu.','error');return;}
+  if(!transactions.length){toast('Belum ada transaksi.','error');return;}
+  statusEl.innerHTML='<span class="spinner"></span> Mengirim '+transactions.length+' transaksi...';
+  try{
+    const r=await fetch(url,{method:'POST',body:JSON.stringify({action:'syncAll',sheetName:getSheetsName(),transactions}),headers:{'Content-Type':'text/plain'}});
+    const d=await r.json();
+    if(d.ok){statusEl.textContent='✅ Semua data berhasil disinkron!';toast('Sync berhasil! ✅','success');}
+    else{statusEl.textContent='❌ '+d.error;toast('Gagal: '+d.error,'error');}
+  }catch(e){statusEl.textContent='❌ Gagal mengirim data.';toast('Gagal mengirim.','error');}
 }
 
 // ── TOAST ──
