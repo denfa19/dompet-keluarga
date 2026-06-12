@@ -435,12 +435,19 @@ hr.div{border:none;border-top:1px solid var(--border);margin:.875rem 0;}
     <div class="section-header">⚙️ Pengaturan</div>
     <div class="card">
       <div class="settings-row" style="margin-bottom:8px;">
-        <div><div class="settings-label">Siklus Anggaran</div><div class="settings-sub">Gaji masuk tiap tanggal berapa?</div></div>
+        <div><div class="settings-label">📅 Siklus Anggaran</div><div class="settings-sub">Gaji masuk / mulai periode tiap tanggal berapa?</div></div>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-        <span style="font-size:13px;color:var(--text2);">Tanggal mulai siklus:</span>
-        <input type="number" id="cycleDayInput" class="form-control" min="1" max="28" value="25" onchange="saveCycleDay(this.value)" style="width:70px;text-align:center;font-weight:600;font-size:15px;">
-        <span style="font-size:12px;color:var(--text3);" id="cyclePreview"></span>
+      <!-- Visual cycle day picker -->
+      <div style="background:var(--surface2);border-radius:var(--r-sm);padding:12px;margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Pilih tanggal mulai siklus</div>
+        <div id="cycleDayPicker" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;"></div>
+        <div style="background:var(--green-light);border-radius:var(--r-sm);padding:8px 10px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:16px;">📆</span>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.4px;">Periode aktif</div>
+            <div id="cyclePreview" style="font-size:13px;font-weight:600;color:var(--text);margin-top:1px;"></div>
+          </div>
+        </div>
       </div>
       <div class="settings-row">
         <div><div class="settings-label">API Key Anthropic</div><div class="settings-sub">Untuk AI Scan via teks/ketik</div></div>
@@ -614,18 +621,36 @@ function saveCycleDay(v) {
   const n = Math.max(1, Math.min(28, parseInt(v)||25));
   cycleDay = n;
   localStorage.setItem('dk_cycleDay', n);
-  document.getElementById('cycleDayInput').value = n;
   updateCyclePreview();
+  renderCyclePicker();
   render();
-  toast('Siklus anggaran diperbarui!','success');
+  toast('Siklus diubah: tgl '+n+' – '+(n===1?28:n-1)+'! ✅','success');
+}
+
+function renderCyclePicker() {
+  const el = document.getElementById('cycleDayPicker');
+  if(!el) return;
+  el.innerHTML = '';
+  for(let d = 1; d <= 28; d++) {
+    const btn = document.createElement('button');
+    const isActive = d === cycleDay;
+    btn.textContent = d;
+    btn.style.cssText = `width:34px;height:34px;border-radius:8px;border:1.5px solid ${isActive?'var(--green)':'var(--border)'};
+      background:${isActive?'var(--green)':'var(--surface)'};color:${isActive?'#fff':'var(--text2)'};
+      font-size:13px;font-weight:${isActive?'700':'600'};cursor:pointer;font-family:inherit;
+      transition:all .15s;flex-shrink:0;`;
+    btn.onclick = () => saveCycleDay(d);
+    el.appendChild(btn);
+  }
 }
 
 function updateCyclePreview() {
   const el = document.getElementById('cyclePreview');
   if(!el) return;
   const { start, end } = getPeriodRange(curYear, curMonth);
-  const fmt2 = d => d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear();
-  el.textContent = fmt2(start)+' – '+fmt2(end);
+  const fmt2 = d => d.getDate()+' '+ ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'][d.getMonth()]+' '+d.getFullYear();
+  const endDay = cycleDay === 1 ? 28 : cycleDay - 1;
+  el.textContent = fmt2(start) + '  →  ' + fmt2(end) + '  (tgl '+cycleDay+' – '+endDay+')';
 }
 
 function save() {
@@ -651,7 +676,7 @@ window.addEventListener('load', () => {
 
   // Load cycle day setting
   cycleDay = parseInt(localStorage.getItem('dk_cycleDay')||'25');
-  document.getElementById('cycleDayInput').value = cycleDay;
+  renderCyclePicker();
 
   // Set curMonth/curYear based on today vs cycleDay
   // If today >= cycleDay → we're in the NEXT month's period
